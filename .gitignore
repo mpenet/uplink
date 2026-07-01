@@ -1,0 +1,4 @@
+lib/*.lua
+test/*.lua
+logs/*.log
+logs/*.pid

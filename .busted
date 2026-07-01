@@ -1,0 +1,11 @@
+return {
+  default = {
+    verbose  = true,
+    coverage = false,
+    helper   = "test/mock.lua",
+    pattern  = "_spec",
+    ["output"] = "plainTerminal",
+    ["auto-insulate"] = false,
+    ROOT = {"test"},
+  },
+}

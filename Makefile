@@ -1,15 +1,20 @@
 FENNEL  ?= fennel
 OPENRESTY ?= openresty
 
-SRC := $(wildcard fennel/*.fnl)
-OUT := $(patsubst fennel/%.fnl,lib/%.lua,$(SRC))
+SRC      := $(wildcard fennel/*.fnl)
+OUT      := $(patsubst fennel/%.fnl,lib/%.lua,$(SRC))
+TEST_SRC := $(wildcard test/*.fnl)
+TEST_OUT := $(patsubst test/%.fnl,test/%.lua,$(TEST_SRC))
 
-.PHONY: all clean run reload check
+.PHONY: all clean run reload check test
 
 all: $(OUT)
 
 lib/%.lua: fennel/%.fnl
 	@mkdir -p lib
+	$(FENNEL) --compile $< > $@
+
+test/%.lua: test/%.fnl
 	$(FENNEL) --compile $< > $@
 
 # Check Fennel syntax without compiling.
@@ -27,6 +32,9 @@ reload:
 
 stop:
 	$(OPENRESTY) -p $(PWD) -c conf/nginx.conf -s stop
+
+test: all $(TEST_OUT)
+	busted test/
 
 clean:
 	rm -f lib/*.lua

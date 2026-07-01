@@ -1,0 +1,33 @@
+name: test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua and LuaRocks
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y lua5.4 luarocks
+
+      - name: Install Fennel
+        run: |
+          sudo luarocks install fennel
+
+      - name: Install test dependencies
+        run: |
+          sudo luarocks install busted
+          sudo luarocks install dkjson
+
+      - name: Compile Fennel → Lua
+        run: make
+
+      - name: Run tests
+        run: make test
