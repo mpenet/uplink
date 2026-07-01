@@ -155,15 +155,28 @@ Scraped at `GET /metrics` in Prometheus text format:
 
 ### Docker
 
-Build the image — Fennel is compiled to Lua at build time and not present in the runtime image:
+Pre-built images are published to GitHub Container Registry on every version tag:
 
 ```sh
-docker build -t ladon .
+docker pull ghcr.io/mpenet/ladon:latest
 ```
 
 Run with a config file mounted:
 
 ```sh
+docker run -p 8080:8080 -v ./config.json:/ladon/config.json ghcr.io/mpenet/ladon:latest
+```
+
+Pin to a specific version for production:
+
+```sh
+docker run -p 8080:8080 -v ./config.json:/ladon/config.json ghcr.io/mpenet/ladon:1.0.0
+```
+
+To build locally instead:
+
+```sh
+docker build -t ladon .
 docker run -p 8080:8080 -v ./config.json:/ladon/config.json ladon
 ```
 
@@ -187,7 +200,7 @@ docker exec <container> curl -s -X POST http://127.0.0.1:8080/reload
 ```yaml
 services:
   ladon:
-    build: .
+    image: ghcr.io/mpenet/ladon:1
     ports:
       - "8080:8080"
     volumes:
@@ -199,6 +212,8 @@ services:
       timeout: 3s
       retries: 3
 ```
+
+Replace `1` with a full version pin (`1.0.0`) for production, or `build: .` to build from source.
 
 ### Kubernetes
 
@@ -225,7 +240,7 @@ spec:
     spec:
       containers:
         - name: ladon
-          image: ladon:latest
+          image: ghcr.io/mpenet/ladon:1.0.0
           ports:
             - containerPort: 8080
           volumeMounts:
