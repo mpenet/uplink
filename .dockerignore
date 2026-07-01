@@ -1,0 +1,11 @@
+.git
+.github
+.gitignore
+.busted
+lib/
+test/
+logs/
+README.md
+CLAUDE.md
+Makefile
+config.json

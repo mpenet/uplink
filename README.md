@@ -151,6 +151,127 @@ Scraped at `GET /metrics` in Prometheus text format:
 | `proxy_requests_total` | `service` | Proxied requests per service |
 | `proxy_errors_total` | `service`, `code` | Proxy errors by HTTP status code |
 
+## Deployment
+
+### Docker
+
+Build the image — Fennel is compiled to Lua at build time and not present in the runtime image:
+
+```sh
+docker build -t ladon .
+```
+
+Run with a config file mounted:
+
+```sh
+docker run -p 8080:8080 -v ./config.json:/ladon/config.json ladon
+```
+
+Logs go to stdout/stderr via OpenResty's error log. To persist logs, mount the logs directory:
+
+```sh
+docker run -p 8080:8080 \
+  -v ./config.json:/ladon/config.json \
+  -v ./logs:/ladon/logs \
+  ladon
+```
+
+Hot-reload works inside the container — exec in and POST to loopback:
+
+```sh
+docker exec <container> curl -s -X POST http://127.0.0.1:8080/reload
+```
+
+### Docker Compose
+
+```yaml
+services:
+  ladon:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.json:/ladon/config.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+```
+
+### Kubernetes
+
+Minimal deployment — `config.json` as a ConfigMap:
+
+```sh
+kubectl create configmap ladon-config --from-file=config.json
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ladon
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ladon
+  template:
+    metadata:
+      labels:
+        app: ladon
+    spec:
+      containers:
+        - name: ladon
+          image: ladon:latest
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /ladon/config.json
+              subPath: config.json
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+      volumes:
+        - name: config
+          configMap:
+            name: ladon-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ladon
+spec:
+  selector:
+    app: ladon
+  ports:
+    - port: 80
+      targetPort: 8080
+```
+
+To update config without restarting pods, update the ConfigMap and exec the reload endpoint into each pod — or simply roll the deployment.
+
+### Shared dict sizing
+
+The defaults in `nginx.conf` suit most deployments:
+
+| Dict | Default | Holds |
+|------|---------|-------|
+| `ladon_cache` | 10m | Raw schema JSON per service |
+| `ladon_metrics` | 1m | Prometheus counters |
+| `ladon_config` | 1m | Active config + version counter |
+
+Increase `ladon_cache` if services have large schemas or many services. Override by mounting a custom `conf/nginx.conf`.
+
 ## Project layout
 
 ```
