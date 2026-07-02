@@ -10,19 +10,23 @@
 
 (local limit-req (require "resty.limit.req"))
 
-;; Per-worker limiter cache: recreated if service config changes.
+;; Per-worker limiter cache: {name -> {lim, rate, burst}}.
+;; Recreated when rate_limit params change so hot-reload takes effect.
 (local limiters {})
 
 (fn get-limiter [service]
-  (let [name service.name]
-    (when (not (. limiters name))
-      (let [rl service.rate_limit
-            rate (or rl.requests_per_second 100)
-            burst (or rl.burst 50)
-            (lim err) (limit-req.new :ladon_ratelimit rate burst)]
+  (let [name service.name
+        rl service.rate_limit
+        rate (or rl.requests_per_second 100)
+        burst (or rl.burst 50)
+        cached (. limiters name)]
+    (when (or (not cached)
+              (not= cached.rate rate)
+              (not= cached.burst burst))
+      (let [(lim err) (limit-req.new :ladon_ratelimit rate burst)]
         (when err (error (.. "rate limiter init failed for " name ": " err)))
-        (tset limiters name lim)))
-    (. limiters name)))
+        (tset limiters name {:lim lim :rate rate :burst burst})))
+    (. (. limiters name) :lim)))
 
 ;; Returns nil when allowed; (false, msg) when the request should be rejected.
 (fn check [service]

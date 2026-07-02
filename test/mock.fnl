@@ -19,22 +19,6 @@
     {:new (fn [_ _ _]
             (values {:incoming (fn [_ _ _] (values rl-delay nil))} nil))}))
 
-;; lua-resty-openssl stubs (mtls.fnl loads these at module level)
-(tset package.preload "resty.openssl.ssl_ctx"
-  (fn []
-    {:new (fn []
-            (values {:ctx {}
-                     :set_certificate (fn [] (values true nil))
-                     :set_private_key (fn [] (values true nil))} nil))}))
-
-(tset package.preload "resty.openssl.x509"
-  (fn []
-    {:new (fn [_] (values {} nil))}))
-
-(tset package.preload "resty.openssl.pkey"
-  (fn []
-    {:new (fn [_] (values {} nil))}))
-
 ;; ngx.semaphore stub: always acquires immediately
 (tset package.preload "ngx.semaphore"
   (fn []
@@ -114,6 +98,8 @@
 
 ;; ── Global ngx mock ───────────────────────────────────────────────────────────
 
+(var _last_exit nil)
+
 (set _G.ngx
   {:INFO 6 :WARN 5 :ERR 3
    :shared {:ladon_cache cache-dict
@@ -126,25 +112,24 @@
    :md5 (fn [s] (string.format "%d:%s:%s" (# s) (s:sub 1 1) (s:sub -1)))
    :var {:request_id "abcdef0123456789abcdef0123456789"
          :uri "/users/v1/profile"
-         :request_uri "/users/v1/profile"}
+         :request_uri "/users/v1/profile"
+         :svc_name "users"
+         :upstream_path ""
+         :upstream_host_header ""
+         :upstream_response_time "0.042"
+         :traceparent ""}
    :req {:get_headers (fn [] {"content-type" "application/json"})
          :get_method (fn [] "GET")
          :read_body (fn [] nil)
          :get_body_data (fn [] nil)}
    :header (setmetatable {} {:__newindex (fn [] nil)})
-   :status (fn [_] nil)
+   :status 200
    :say (fn [_] nil)
-   :socket {:tcp (fn []
-                   {:settimeout (fn [] nil)
-                    :connect (fn [] (values true nil))
-                    :getreusedtimes (fn [] 0)
-                    :setsslctx (fn [] (values true nil))
-                    :sslhandshake (fn [_ _sess _host _verify] (values {} nil))
-                    :send (fn [] (values true nil))
-                    :receiveuntil (fn [] (fn [] (values "" nil)))
-                    :receive (fn [] (values "" nil))
-                    :setkeepalive (fn [] true)
-                    :close (fn [] true)})}})
+   :print (fn [_] nil)
+   ;; ngx.exit: record code then raise so callers can catch with pcall.
+   :exit (fn [code]
+           (set _last_exit code)
+           (error (.. "ngx.exit:" code)))})
 
 (set _G._mock_dicts
   {:cache cache-dict :metrics metrics-dict :config config-dict
@@ -158,6 +143,8 @@
 (set _G.set_http_error (fn [err] (set http-error err) (set http-response nil)))
 (set _G.set_rl_delay (fn [d] (set rl-delay d)))
 
+(set _G.get_last_exit (fn [] _last_exit))
+
 (set _G.reset_mocks
   (fn []
     (cache-dict:_reset)
@@ -167,9 +154,16 @@
     (ratelimit-dict:_reset)
     (reset-http)
     (set rl-delay 0)
+    (set _last_exit nil)
+    (tset _G.ngx :status 200)
     (tset _G.ngx :var {:request_id "abcdef0123456789abcdef0123456789"
                        :uri "/users/v1/profile"
-                       :request_uri "/users/v1/profile"})
+                       :request_uri "/users/v1/profile"
+                       :svc_name "users"
+                       :upstream_path ""
+                       :upstream_host_header ""
+                       :upstream_response_time "0.042"
+                       :traceparent ""})
     (tset _G.ngx :req
       {:get_headers (fn [] {"content-type" "application/json"})
        :get_method (fn [] "GET")

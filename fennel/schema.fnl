@@ -2,7 +2,6 @@
 (local json (require :cjson))
 (local rules-mod (require :rules))
 (local metrics (require :metrics))
-(local mtls (require :mtls))
 
 ;; lyaml is optional; YAML schema URLs fail gracefully when absent.
 (local (lyaml-ok lyaml) (pcall require :lyaml))
@@ -46,39 +45,30 @@
       (error (.. "YAML schema at " url " requires lyaml (not installed)")))
     (json.decode raw)))
 
-;; Fetch schema URL, optionally using mTLS client when service.tls.cert is set.
+;; Fetch schema URL. When service.tls.cert/key are set, passes client cert
+;; to resty.http so schema endpoints requiring mTLS are reachable.
 (fn fetch [service]
   (let [url service.schema_url
         timeout (or service.timeout schema-fetch-timeout-ms)
         tls service.tls
-        use-mtls (and tls (or tls.cert tls.key))]
-    (if use-mtls
-      (let [(ok result) (pcall mtls.request
-                          {:url url :method "GET" :timeout timeout
-                           :service-name service.name :tls tls})]
-        (if (not ok)
-          (error (.. "schema fetch failed (mTLS): " result))
-          (if (not= result.status 200)
-            (error (.. "schema fetch returned HTTP " result.status " for " url))
-            (let [ct (or (. result.headers "content-type") "")
-                  body (parse-body url ct result.body)
-                  upstream-ttl (parse-cache-ttl result.headers)]
-              {:body body :upstream-ttl upstream-ttl}))))
-      ;; Standard path
-      (let [client (http.new)
-            _ (client:set_timeout timeout)
-            ssl-verify (and tls tls.verify)
-            (res err) (client:request_uri url {:method :GET :ssl_verify (or ssl-verify false)})]
-        (if err
-          (do (client:close) (error (.. "schema fetch failed: " err)))
-          (if (not= res.status 200)
-            (do (client:close)
-                (error (.. "schema fetch returned HTTP " res.status " for " url)))
-            (let [ct (or (. res.headers :content-type) "")
-                  body (parse-body url ct res.body)
-                  upstream-ttl (parse-cache-ttl res.headers)]
-              (client:set_keepalive keepalive-timeout-ms keepalive-pool-size)
-              {:body body :upstream-ttl upstream-ttl})))))))
+        ssl-verify (and tls tls.verify)
+        opts {:method :GET :ssl_verify (or ssl-verify false)}
+        _ (when (and tls tls.cert tls.key)
+            (tset opts :ssl_client_cert tls.cert)
+            (tset opts :ssl_client_priv_key tls.key))
+        client (http.new)
+        _ (client:set_timeout timeout)
+        (res err) (client:request_uri url opts)]
+    (if err
+      (do (client:close) (error (.. "schema fetch failed: " err)))
+      (if (not= res.status 200)
+        (do (client:close)
+            (error (.. "schema fetch returned HTTP " res.status " for " url)))
+        (let [ct (or (. res.headers :content-type) "")
+              body (parse-body url ct res.body)
+              upstream-ttl (parse-cache-ttl res.headers)]
+          (client:set_keepalive keepalive-timeout-ms keepalive-pool-size)
+          {:body body :upstream-ttl upstream-ttl})))))
 
 (fn rewrite-ref-str [service-name ref]
   (let [prefix "#/components/"]

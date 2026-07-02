@@ -36,10 +36,20 @@
       (tset (. acc section) name h)))
   acc)
 
+;; Deep-copy a plain table (no cycles, no metatables — safe for JSON-derived data).
+(fn deep-copy [obj]
+  (if (not= (type obj) :table)
+    obj
+    (let [copy {}]
+      (each [k v (pairs obj)]
+        (tset copy k (deep-copy v)))
+      copy)))
+
 (fn prefix-paths [service-name paths]
   (let [out {}]
     (each [path item (pairs paths)]
-      (tset out (.. "/" service-name path) item))
+      ;; Copy each path-item so apply-aliases! does not mutate the worker cache.
+      (tset out (.. "/" service-name path) (deep-copy item)))
     out))
 
 ;; Deduplicate identical components using pre-computed hashes where available.

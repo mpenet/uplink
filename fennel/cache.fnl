@@ -61,15 +61,17 @@
             (tset value-cache key {:gen gen :value decoded})
             decoded))))))
 
-;; Write value + metadata (gen incremented atomically first).
+;; Write value + metadata (value first, then gen bump, then metadata).
+;; Readers only observe the new gen after value is committed.
 ;; Returns the new generation number.
 (fn raw-set [key value ttl]
   (let [d (get-dict)
-        (gen _) (d:incr (.. key gen-suffix) 1 0)
-        meta (json.encode {:ttl (or ttl 300) :fetched_at (ngx.now) :gen gen})]
-    (d:set key meta 0)
-    (d:set (.. key val-suffix) (json.encode value) 0)
-    gen))
+        encoded (json.encode value)]
+    (d:set (.. key val-suffix) encoded 0)
+    (let [(gen _) (d:incr (.. key gen-suffix) 1 0)
+          meta (json.encode {:ttl (or ttl 300) :fetched_at (ngx.now) :gen gen})]
+      (d:set key meta 0)
+      gen)))
 
 (fn cache-get [key]
   (let [meta (raw-get-meta key)]
@@ -129,8 +131,9 @@
           (let [fresh (raw-get-meta key)]
             (if (fresh? fresh)
               (do (sema:post 1) (raw-get-value key fresh.gen))
-              (let [v (do-refresh key default-ttl thunk fresh)]
+              (let [(ok v) (pcall do-refresh key default-ttl thunk fresh)]
                 (sema:post 1)
+                (when (not ok) (error v))
                 v))))))))
 
 ;; Force-refresh regardless of TTL — used by background timer.

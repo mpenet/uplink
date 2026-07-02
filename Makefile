@@ -1,41 +1,52 @@
-FENNEL  ?= fennel
+FENNEL    ?= fennel
 OPENRESTY ?= openresty
+LUA       ?= lua
 
-SRC      := $(wildcard fennel/*.fnl)
+SRC      := $(filter-out fennel/generate.fnl,$(wildcard fennel/*.fnl))
 OUT      := $(patsubst fennel/%.fnl,lib/%.lua,$(SRC))
 TEST_SRC := $(wildcard test/*.fnl)
 TEST_OUT := $(patsubst test/%.fnl,test/%.lua,$(TEST_SRC))
 
-.PHONY: all clean run reload check test
+.PHONY: all clean run reload stop check test generate
 
-all: $(OUT)
+all: $(OUT) generate.lua
 
+# Compile all Fennel modules to lib/
 lib/%.lua: fennel/%.fnl
 	@mkdir -p lib
 	$(FENNEL) --compile $< > $@
 
+# Compile standalone generator
+generate.lua: fennel/generate.fnl
+	$(FENNEL) --compile $< > $@
+
+# Generate nginx include files from config.json
+generate: generate.lua
+	$(LUA) generate.lua
+
 test/%.lua: test/%.fnl
 	$(FENNEL) --compile $< > $@
 
-# Check Fennel syntax without compiling.
 check:
 	@for f in fennel/*.fnl; do \
 	    echo "checking $$f"; \
 	    $(FENNEL) --compile $$f > /dev/null && echo "  ok" || echo "  FAIL"; \
 	done
 
-run: all
-	$(OPENRESTY) -p $(PWD) -c conf/nginx.conf
+# Generate nginx conf then start OpenResty.
+run: all generate
+	$(OPENRESTY) -p $(PWD) -c nginx/nginx.conf
 
 reload:
-	$(OPENRESTY) -p $(PWD) -c conf/nginx.conf -s reload
+	$(OPENRESTY) -p $(PWD) -c nginx/nginx.conf -s reload
 
 stop:
-	$(OPENRESTY) -p $(PWD) -c conf/nginx.conf -s stop
+	$(OPENRESTY) -p $(PWD) -c nginx/nginx.conf -s stop
 
 test: all $(TEST_OUT)
 	busted test/
 
 clean:
-	rm -f lib/*.lua
+	rm -f lib/*.lua generate.lua
+	rm -f nginx/upstreams.conf nginx/locations.conf
 	rm -f logs/*.log logs/*.pid

@@ -1,4 +1,5 @@
-lib/*.lua
-test/*.lua
+**.lua
 logs/*.log
 logs/*.pid
+nginx/upstreams.conf
+nginx/locations.conf
