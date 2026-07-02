@@ -31,8 +31,8 @@
 ;; -- Shared-dict persistence for hot-reload --
 
 (fn get-shared-dict []
-  (let [d (. ngx.shared :ladon_config)]
-    (assert d "lua_shared_dict 'ladon_config' not defined in nginx.conf")
+  (let [d (. ngx.shared :uplink_config)]
+    (assert d "lua_shared_dict 'uplink_config' not defined in nginx.conf")
     d))
 
 (fn store-in-shared [cfg]
@@ -52,7 +52,7 @@
     (json.decode raw)))
 
 (fn get-version []
-  (let [d (. ngx.shared :ladon_config)]
+  (let [d (. ngx.shared :uplink_config)]
     (or (and d (d:get :version)) 0)))
 
 ;; Reload from file, validate, store in shared dict.

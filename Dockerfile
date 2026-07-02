@@ -24,10 +24,10 @@ RUN apk add --no-cache libyaml
 # lyaml .so from builder
 COPY --from=builder /usr/local/openresty/luajit/share/lua/ /usr/local/openresty/luajit/share/lua/
 COPY --from=builder /usr/local/openresty/luajit/lib/lua/ /usr/local/openresty/luajit/lib/lua/
-COPY --from=builder /build/lib/ /ladon/lib/
-COPY --from=builder /build/generate.lua /ladon/generate.lua
+COPY --from=builder /build/lib/ /uplink/lib/
+COPY --from=builder /build/generate.lua /uplink/generate.lua
 
-WORKDIR /ladon
+WORKDIR /uplink
 COPY nginx/nginx.conf    nginx/nginx.conf
 COPY nginx/entrypoint.sh nginx/entrypoint.sh
 RUN chmod +x nginx/entrypoint.sh && mkdir -p logs nginx
@@ -36,5 +36,5 @@ EXPOSE 8080
 
 # Entrypoint generates nginx/upstreams.conf + nginx/locations.conf from
 # config.json, validates, then starts nginx.
-# Mount config at runtime: docker run -v ./config.json:/ladon/config.json ladon
+# Mount config at runtime: docker run -v ./config.json:/uplink/config.json uplink
 ENTRYPOINT ["nginx/entrypoint.sh"]

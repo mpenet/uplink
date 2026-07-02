@@ -2,16 +2,16 @@
 ;;
 ;; Zero cost when disabled: all code is guarded by the module-level dict check.
 ;; Enable by adding both:
-;;   1. lua_shared_dict ladon_otel 2m;  in nginx.conf
+;;   1. lua_shared_dict uplink_otel 2m;  in nginx.conf
 ;;   2. "otel": { "endpoint": "..." }   in config.json
 ;;
-;; Without (1), ngx.shared.ladon_otel is nil and every function is a no-op.
+;; Without (1), ngx.shared.uplink_otel is nil and every function is a no-op.
 ;; Without (2), no flush timer starts; written spans expire after 120 s TTL.
 ;;
 ;; Each worker flushes independently. Duplicate exports under concurrent flush
 ;; windows are possible but rare and harmless for traces.
 ;;
-;; Buffer: ring of BUFFER_SIZE slots in ladon_otel. Oldest spans are silently
+;; Buffer: ring of BUFFER_SIZE slots in uplink_otel. Oldest spans are silently
 ;; overwritten if the flush timer falls too far behind.
 ;;
 ;; Span IDs: traceId and parentSpanId are extracted from the W3C traceparent
@@ -24,7 +24,7 @@
 (local BUFFER_SIZE 1000)
 
 (fn get-dict []
-  (. ngx.shared :ladon_otel))
+  (. ngx.shared :uplink_otel))
 
 ;; Convert hex string (traceId=32 chars, spanId=16 chars) to base64 for OTLP/JSON.
 (fn hex->b64 [hex]
@@ -57,7 +57,7 @@
               [{:key "http.method" :value {:stringValue (ngx.req.get_method)}}
                {:key "http.target" :value {:stringValue ngx.var.uri}}
                {:key "http.status_code" :value {:intValue status}}
-               {:key "ladon.service" :value {:stringValue svc-name}}]
+               {:key "uplink.service" :value {:stringValue svc-name}}]
               :status {:code (if (>= status 500) 2 1)}}]
     (when (and tp tp.parent-id)
       (tset span :parentSpanId (hex->b64 tp.parent-id)))
@@ -99,9 +99,9 @@
                             [{:resource
                               {:attributes [{:key "service.name"
                                             :value {:stringValue
-                                                    (or cfg.service_name "ladon")}}]}
+                                                    (or cfg.service_name "uplink")}}]}
                               :scopeSpans
-                              [{:scope {:name "ladon"}
+                              [{:scope {:name "uplink"}
                                 :spans spans}]}]})
                     (res err) (c:request_uri cfg.endpoint
                                 {:method "POST"
@@ -130,6 +130,6 @@
       (if cfg.otel
         (schedule-flush cfg.otel)
         (ngx.log ngx.WARN
-          "otel: ladon_otel dict present but no otel config in config.json")))))
+          "otel: uplink_otel dict present but no otel config in config.json")))))
 
 {:push! push! :flush flush :init-worker init-worker}

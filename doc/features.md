@@ -20,7 +20,7 @@ Each service's OpenAPI schema is fetched from `schema_url`, filtered by `rules`,
 - **Path prefixing** — all paths are prefixed with `/service-name` in the merged schema.
 - **TTL priority** — `Cache-Control: s-maxage` > `Cache-Control: max-age` > `Expires` header > config `ttl`.
 - **Background refresh** — each service has a timer firing at 90% of its TTL. On failure, the last good schema is served and a warning is logged.
-- **Degraded mode** — if a service has no usable schema (cold miss + fetch failure), it is excluded from the merged doc and listed in `X-Ladon-Degraded`.
+- **Degraded mode** — if a service has no usable schema (cold miss + fetch failure), it is excluded from the merged doc and listed in `X-Uplink-Degraded`.
 
 ## Hot reload
 
@@ -57,6 +57,6 @@ The `/reload` endpoint is restricted to loopback (`127.0.0.1` / `::1`).
 | `POST /reload` | Hot-reload `config.json` (loopback only) |
 | `* /{name}/...` | Proxy to the named service |
 
-`X-Ladon-Degraded: svc1,svc2` is set on `/openapi.json` responses when one or more services have no usable schema.
+`X-Uplink-Degraded: svc1,svc2` is set on `/openapi.json` responses when one or more services have no usable schema.
 
 Proxied requests carry: `traceparent` (W3C, propagated or generated), `X-Request-ID`, `X-Forwarded-For`, `X-Forwarded-Proto`.

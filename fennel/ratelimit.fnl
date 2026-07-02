@@ -1,5 +1,5 @@
 ;; Per-service rate limiting using lua-resty-limit-traffic (bundled with OpenResty).
-;; nginx.conf must declare: lua_shared_dict ladon_ratelimit 1m;
+;; nginx.conf must declare: lua_shared_dict uplink_ratelimit 1m;
 ;;
 ;; Config on service.rate_limit:
 ;;   requests_per_second — allowed rate (default 100)
@@ -23,7 +23,7 @@
     (when (or (not cached)
               (not= cached.rate rate)
               (not= cached.burst burst))
-      (let [(lim err) (limit-req.new :ladon_ratelimit rate burst)]
+      (let [(lim err) (limit-req.new :uplink_ratelimit rate burst)]
         (when err (error (.. "rate limiter init failed for " name ": " err)))
         (tset limiters name {:lim lim :rate rate :burst burst})))
     (. (. limiters name) :lim)))

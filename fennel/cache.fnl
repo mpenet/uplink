@@ -1,5 +1,5 @@
 ;; TTL cache backed by ngx.shared.dict.
-;; nginx.conf must declare: lua_shared_dict ladon_cache <size>;
+;; nginx.conf must declare: lua_shared_dict uplink_cache <size>;
 ;;
 ;; Split storage per key:
 ;;   key        → small metadata JSON {ttl, fetched_at, gen}
@@ -22,8 +22,8 @@
 (var _dict nil)
 (fn get-dict []
   (when (not _dict)
-    (set _dict (assert (. ngx.shared :ladon_cache)
-                       "lua_shared_dict 'ladon_cache' not defined in nginx.conf")))
+    (set _dict (assert (. ngx.shared :uplink_cache)
+                       "lua_shared_dict 'uplink_cache' not defined in nginx.conf")))
   _dict)
 
 ;; NUL byte via string.char avoids Fennel lexer issues with \0 escapes.

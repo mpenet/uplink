@@ -23,9 +23,9 @@
 (local metrics (require :metrics))
 (local otel (require :otel))
 
-;; Evaluated once per worker at module load. If ladon_otel dict is absent from
+;; Evaluated once per worker at module load. If uplink_otel dict is absent from
 ;; nginx.conf this is nil and the log phase skips otel at zero cost.
-(local otel-enabled (not= nil (. ngx.shared :ladon_otel)))
+(local otel-enabled (not= nil (. ngx.shared :uplink_otel)))
 
 ;; Per-worker service lookup table, rebuilt only when config version changes.
 (var services-by-name {})

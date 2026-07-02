@@ -1,4 +1,4 @@
-# Ladon
+# Uplink
 
 <img width="200" height="200"  src="https://github.com/user-attachments/assets/f1bf8013-b7d9-4835-9be5-a6f8cc1ec792" />
 
@@ -9,7 +9,7 @@ Proxying runs entirely through native nginx `proxy_pass` — keepalive pools, TL
 
 ## How it works
 
-`config.json` describes your upstream services. At startup, Ladon generates nginx upstream and location blocks from it, then proxies requests under each service's `/name` prefix.
+`config.json` describes your upstream services. At startup, Uplink generates nginx upstream and location blocks from it, then proxies requests under each service's `/name` prefix.
 
 - **Routing**: `GET /users/v1/profile` → strip `/users` → `GET /v1/profile` to the users upstream, over a keepalive pool
 - **Schema aggregation**: each service's OpenAPI schema is fetched, filtered by rules, component names are namespaced (`User` → `users__User`), and paths are prefixed before merging into `/openapi.json`
@@ -20,15 +20,15 @@ Proxying runs entirely through native nginx `proxy_pass` — keepalive pools, TL
 Pull the prebuilt image from the GitHub Container Registry:
 
 ```sh
-docker pull ghcr.io/mpenet/ladon:latest
-docker run -p 8080:8080 -v ./config.json:/ladon/config.json ghcr.io/mpenet/ladon:latest
+docker pull ghcr.io/mpenet/uplink:latest
+docker run -p 8080:8080 -v ./config.json:/uplink/config.json ghcr.io/mpenet/uplink:latest
 ```
 
 Or build from source:
 
 ```sh
-docker build -t ladon .
-docker run -p 8080:8080 -v ./config.json:/ladon/config.json ladon
+docker build -t uplink .
+docker run -p 8080:8080 -v ./config.json:/uplink/config.json uplink
 ```
 
 Copy [`config.json.sample`](config.json.sample) to `config.json`, point it at your upstreams, and you're done.

@@ -123,7 +123,7 @@
     (let [{:components deduped :aliases aliases} (dedup-components all-components all-hashes)]
       (apply-aliases! aliases all-paths deduped)
       {:doc {:openapi    "3.0.0"
-             :info       {:title "Ladon API Gateway" :version "1.0.0"}
+             :info       {:title "Uplink API Gateway" :version "1.0.0"}
              :paths      all-paths
              :components deduped}
        :degraded degraded})))
@@ -140,7 +140,7 @@
         (set agg-gen gen)))
     (ngx.header.content_type "application/json; charset=utf-8")
     (when (> (# agg-degraded) 0)
-      (ngx.header.x_ladon_degraded (table.concat agg-degraded ",")))
+      (ngx.header.x_uplink_degraded (table.concat agg-degraded ",")))
     (ngx.say agg-body)))
 
 {:build build

@@ -1,5 +1,5 @@
-;; Prometheus-style metrics in ngx.shared.dict ladon_metrics.
-;; nginx.conf must declare: lua_shared_dict ladon_metrics 2m;
+;; Prometheus-style metrics in ngx.shared.dict uplink_metrics.
+;; nginx.conf must declare: lua_shared_dict uplink_metrics 2m;
 ;;
 ;; Per-worker key memoization: repeated calls for the same metric+labels
 ;; combination never allocate a new string.
@@ -10,8 +10,8 @@
 (var _dict nil)
 (fn get-dict []
   (when (not _dict)
-    (set _dict (assert (. ngx.shared :ladon_metrics)
-                       "lua_shared_dict 'ladon_metrics' not defined in nginx.conf")))
+    (set _dict (assert (. ngx.shared :uplink_metrics)
+                       "lua_shared_dict 'uplink_metrics' not defined in nginx.conf")))
   _dict)
 
 (local key-memo {})

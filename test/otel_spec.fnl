@@ -83,7 +83,7 @@
         (otel.push! "users")
         (otel.push! "orders")
         (otel.flush {:endpoint "http://collector:4318/v1/traces"
-                     :service_name "ladon"
+                     :service_name "uplink"
                      :batch_size 100})
         (assert.equals 2 (_mock_dicts.otel:get :flushed))))
 

@@ -119,12 +119,12 @@
 
 (set _G.ngx
   {:INFO 6 :WARN 5 :ERR 3
-   :shared {:ladon_cache cache-dict
-            :ladon_metrics metrics-dict
-            :ladon_config config-dict
-            :ladon_circuit circuit-dict
-            :ladon_ratelimit ratelimit-dict
-            :ladon_otel otel-dict}
+   :shared {:uplink_cache cache-dict
+            :uplink_metrics metrics-dict
+            :uplink_config config-dict
+            :uplink_circuit circuit-dict
+            :uplink_ratelimit ratelimit-dict
+            :uplink_otel otel-dict}
    :log (fn [& _] nil)
    :now (fn [] (os.time))
    :md5 (fn [s] (string.format "%d:%s:%s" (# s) (s:sub 1 1) (s:sub -1)))

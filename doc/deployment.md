@@ -5,15 +5,15 @@
 ### Prebuilt image
 
 ```sh
-docker pull ghcr.io/mpenet/ladon:latest
+docker pull ghcr.io/mpenet/uplink:latest
 ```
 
-Images are published to the GitHub Container Registry on every push to `main`. Use a specific tag (e.g. `ghcr.io/mpenet/ladon:0.1.0`) in production rather than `latest`.
+Images are published to the GitHub Container Registry on every push to `main`. Use a specific tag (e.g. `ghcr.io/mpenet/uplink:0.1.0`) in production rather than `latest`.
 
 ### Build from source
 
 ```sh
-docker build -t ladon .
+docker build -t uplink .
 ```
 
 The Dockerfile uses a two-stage build:
@@ -33,11 +33,11 @@ What must be mounted at runtime:
 ### Run
 
 ```sh
-docker run -p 8080:8080 -v ./config.json:/ladon/config.json ladon
+docker run -p 8080:8080 -v ./config.json:/uplink/config.json uplink
 ```
 
 On startup the entrypoint:
-1. Reads `config.json` (or `$LADON_CONFIG`) — exits with an error if missing
+1. Reads `config.json` (or `$UPLINK_CONFIG`) — exits with an error if missing
 2. Runs `luajit generate.lua` — writes `nginx/upstreams.conf`, `nginx/locations.conf`, `nginx/listen.conf`
 3. Validates the generated config with `openresty -t`
 4. Starts OpenResty in the foreground
@@ -46,18 +46,18 @@ On startup the entrypoint:
 
 ```sh
 docker run -p 8080:8080 \
-  -e LADON_CONFIG=/etc/ladon/config.json \
-  -v ./config.json:/etc/ladon/config.json \
-  ladon
+  -e UPLINK_CONFIG=/etc/uplink/config.json \
+  -v ./config.json:/etc/uplink/config.json \
+  uplink
 ```
 
 ### Upstream mTLS
 
 ```sh
 docker run -p 8080:8080 \
-  -v ./config.json:/ladon/config.json \
+  -v ./config.json:/uplink/config.json \
   -v ./certs:/certs:ro \
-  ladon
+  uplink
 ```
 
 Cert paths in `config.json` must match the mount point inside the container.
@@ -68,9 +68,9 @@ Expose port 8443 and mount the server certificate:
 
 ```sh
 docker run -p 8080:8080 -p 8443:8443 \
-  -v ./config.json:/ladon/config.json \
+  -v ./config.json:/uplink/config.json \
   -v ./certs:/certs:ro \
-  ladon
+  uplink
 ```
 
 `server.tls` in `config.json` must reference absolute paths inside the container (e.g. `/certs/server.crt`).
@@ -89,9 +89,9 @@ To override shared dict sizes, log format, or other nginx settings:
 
 ```sh
 docker run -p 8080:8080 \
-  -v ./config.json:/ladon/config.json \
-  -v ./nginx/nginx.conf:/ladon/nginx/nginx.conf \
-  ladon
+  -v ./config.json:/uplink/config.json \
+  -v ./nginx/nginx.conf:/uplink/nginx/nginx.conf \
+  uplink
 ```
 
 Use [`nginx/nginx.conf.sample`](../nginx/nginx.conf.sample) as a starting point.
@@ -100,12 +100,12 @@ Use [`nginx/nginx.conf.sample`](../nginx/nginx.conf.sample) as a starting point.
 
 ```yaml
 services:
-  ladon:
+  uplink:
     build: .
     ports:
       - "8080:8080"
     volumes:
-      - ./config.json:/ladon/config.json
+      - ./config.json:/uplink/config.json
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/healthz"]
@@ -117,32 +117,32 @@ services:
 ## Kubernetes
 
 ```sh
-kubectl create configmap ladon-config --from-file=config.json
+kubectl create configmap uplink-config --from-file=config.json
 ```
 
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ladon
+  name: uplink
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: ladon
+      app: uplink
   template:
     metadata:
       labels:
-        app: ladon
+        app: uplink
     spec:
       containers:
-        - name: ladon
-          image: ladon:latest
+        - name: uplink
+          image: uplink:latest
           ports:
             - containerPort: 8080
           volumeMounts:
             - name: config
-              mountPath: /ladon/config.json
+              mountPath: /uplink/config.json
               subPath: config.json
           livenessProbe:
             httpGet: { path: /healthz, port: 8080 }
@@ -152,15 +152,15 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: ladon-config
+            name: uplink-config
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: ladon
+  name: uplink
 spec:
   selector:
-    app: ladon
+    app: uplink
   ports:
     - port: 80
       targetPort: 8080
@@ -172,12 +172,12 @@ To update rules/rate limits/circuit breaker thresholds without restarting: updat
 
 | Dict | Default | Holds |
 |------|---------|-------|
-| `ladon_cache` | 10m | Schema JSON per service — increase for large or many schemas |
-| `ladon_metrics` | 2m | Prometheus counters and histogram buckets |
-| `ladon_config` | 1m | Active config + version counter |
-| `ladon_circuit` | 1m | Circuit breaker state per service |
-| `ladon_ratelimit` | 1m | Rate limiter state per service |
-| `ladon_otel` | 2m | OTel span ring buffer (optional — see [observability](observability.md)) |
+| `uplink_cache` | 10m | Schema JSON per service — increase for large or many schemas |
+| `uplink_metrics` | 2m | Prometheus counters and histogram buckets |
+| `uplink_config` | 1m | Active config + version counter |
+| `uplink_circuit` | 1m | Circuit breaker state per service |
+| `uplink_ratelimit` | 1m | Rate limiter state per service |
+| `uplink_otel` | 2m | OTel span ring buffer (optional — see [observability](observability.md)) |
 
 Override by mounting a custom `nginx/nginx.conf`. See [`nginx/nginx.conf.sample`](../nginx/nginx.conf.sample) for a fully annotated starting point.
 

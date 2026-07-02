@@ -40,7 +40,7 @@
           "strip": ["X-Internal-Token", "X-Debug"]
         },
         "response": {
-          "set":   {"X-Gateway": "ladon"},
+          "set":   {"X-Gateway": "uplink"},
           "strip": ["X-Powered-By", "Server"]
         }
       },

@@ -1,6 +1,6 @@
 # Configuration
 
-`config.json` at the project root. Override path with `LADON_CONFIG` env var.
+`config.json` at the project root. Override path with `UPLINK_CONFIG` env var.
 
 See [`config.json.sample`](../config.json.sample) for a full annotated example.
 
@@ -92,7 +92,7 @@ Requires `make generate && make reload`.
 
 ## Upstream mTLS
 
-Ladon presents a client certificate to the upstream for both proxied requests and schema fetches:
+Uplink presents a client certificate to the upstream for both proxied requests and schema fetches:
 
 ```json
 "tls": {
@@ -207,7 +207,7 @@ OPTIONS preflight is short-circuited with `204`. Requires `make generate && make
     "strip": ["X-Internal-Token"]
   },
   "response": {
-    "set":   {"X-Gateway": "ladon"},
+    "set":   {"X-Gateway": "uplink"},
     "strip": ["X-Powered-By", "Server"]
   }
 }

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-CONFIG="${LADON_CONFIG:-/ladon/config.json}"
+CONFIG="${UPLINK_CONFIG:-/uplink/config.json}"
 
 if [ ! -f "$CONFIG" ]; then
   echo "error: config file not found at $CONFIG" >&2
@@ -9,13 +9,13 @@ if [ ! -f "$CONFIG" ]; then
   exit 1
 fi
 
-cd /ladon
+cd /uplink
 
 echo "generating nginx config from $CONFIG..."
 luajit generate.lua
 
 echo "validating nginx config..."
-openresty -p /ladon -c nginx/nginx.conf -t
+openresty -p /uplink -c nginx/nginx.conf -t
 
 echo "starting openresty..."
-exec openresty -p /ladon -c nginx/nginx.conf -g "daemon off;"
+exec openresty -p /uplink -c nginx/nginx.conf -g "daemon off;"

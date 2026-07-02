@@ -121,12 +121,12 @@
   (fn []
     (it "injects response headers"
       (fn []
-        (load-service (make-svc {:headers {:response {:set {"X-Gateway" "ladon"}}}}))
+        (load-service (make-svc {:headers {:response {:set {"X-Gateway" "uplink"}}}}))
         (tset package.loaded :router nil)
         (set router (require :router))
         (tset _G.ngx :status 200)
         (router.on_response)
-        (assert.equals "ladon" (. _G.ngx.header "X-Gateway"))))
+        (assert.equals "uplink" (. _G.ngx.header "X-Gateway"))))
 
     (it "strips response headers"
       (fn []

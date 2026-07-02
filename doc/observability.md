@@ -33,14 +33,14 @@ Override the log path or format by mounting a custom `nginx/nginx.conf`.
 
 ## OpenTelemetry
 
-Ladon exports spans via OTLP/HTTP+JSON. Disabled at zero cost by default — if `ladon_otel` is absent from `nginx.conf`, the check is a single nil comparison per request and no shared dict is touched.
+Uplink exports spans via OTLP/HTTP+JSON. Disabled at zero cost by default — if `uplink_otel` is absent from `nginx.conf`, the check is a single nil comparison per request and no shared dict is touched.
 
 ### Enabling
 
 **1. Uncomment the shared dict in `nginx/nginx.conf`:**
 
 ```nginx
-lua_shared_dict ladon_otel 2m;
+lua_shared_dict uplink_otel 2m;
 ```
 
 **2. Add `otel` to `config.json`:**
@@ -48,7 +48,7 @@ lua_shared_dict ladon_otel 2m;
 ```json
 "otel": {
   "endpoint":       "http://otel-collector:4318/v1/traces",
-  "service_name":   "ladon",
+  "service_name":   "uplink",
   "batch_size":     100,
   "flush_interval": 5
 }
@@ -57,7 +57,7 @@ lua_shared_dict ladon_otel 2m;
 | Field | Default | Description |
 |-------|---------|-------------|
 | `endpoint` | — | OTLP/HTTP collector URL (required) |
-| `service_name` | `"ladon"` | `service.name` resource attribute |
+| `service_name` | `"uplink"` | `service.name` resource attribute |
 | `batch_size` | `100` | Max spans per HTTP POST |
 | `flush_interval` | `5` | Flush timer interval in seconds |
 
@@ -65,7 +65,7 @@ Both must be set. If the dict is present but `otel` is absent from config, a war
 
 ### How it works
 
-Each proxied request produces one span in the log phase. Spans are written to the `ladon_otel` shared dict (ring buffer, 1000 slots). A per-worker timer fires every `flush_interval` seconds and POSTs pending spans as OTLP/HTTP+JSON to the collector.
+Each proxied request produces one span in the log phase. Spans are written to the `uplink_otel` shared dict (ring buffer, 1000 slots). A per-worker timer fires every `flush_interval` seconds and POSTs pending spans as OTLP/HTTP+JSON to the collector.
 
 **Span fields:**
 
@@ -79,18 +79,18 @@ Each proxied request produces one span in the log phase. Spans are written to th
 | `startTimeUnixNano` | `ngx.req.start_time()` |
 | `endTimeUnixNano` | `ngx.now()` at log phase |
 
-Attributes: `http.method`, `http.target`, `http.status_code`, `ladon.service`.
+Attributes: `http.method`, `http.target`, `http.status_code`, `uplink.service`.
 
-Trace continuity relies on upstream services propagating `traceparent`. Ladon always injects or generates one in the access phase regardless of whether OTel is enabled.
+Trace continuity relies on upstream services propagating `traceparent`. Uplink always injects or generates one in the access phase regardless of whether OTel is enabled.
 
 ### Delivery guarantees
 
-Span export is best-effort. If the collector is unreachable, spans are dropped after filling the ring buffer. The flushed cursor advances even on POST failure to avoid stacking retries when the collector is down. Increase `ladon_otel` dict size to buffer more spans during outages.
+Span export is best-effort. If the collector is unreachable, spans are dropped after filling the ring buffer. The flushed cursor advances even on POST failure to avoid stacking retries when the collector is down. Increase `uplink_otel` dict size to buffer more spans during outages.
 
 ### Shared dict sizing
 
 `2m` holds approximately 1000 spans. Increase if `flush_interval` is long or traffic is high:
 
 ```nginx
-lua_shared_dict ladon_otel 8m;  # ~4000 spans
+lua_shared_dict uplink_otel 8m;  # ~4000 spans
 ```

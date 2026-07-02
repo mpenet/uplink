@@ -1,5 +1,5 @@
 ;; Circuit breaker: CLOSED → OPEN → HALF-OPEN → CLOSED
-;; State persisted in ladon_circuit shared dict so all workers share it.
+;; State persisted in uplink_circuit shared dict so all workers share it.
 ;;
 ;; Keys per service:
 ;;   cb:<name>:state  — "open" when tripped (nil/absent = closed)
@@ -19,8 +19,8 @@
 (var _dict nil)
 (fn get-dict []
   (when (not _dict)
-    (set _dict (assert (. ngx.shared :ladon_circuit)
-                       "lua_shared_dict 'ladon_circuit' not defined in nginx.conf")))
+    (set _dict (assert (. ngx.shared :uplink_circuit)
+                       "lua_shared_dict 'uplink_circuit' not defined in nginx.conf")))
   _dict)
 
 (fn state-key [n]  (.. "cb:" n ":state"))

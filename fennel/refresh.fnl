@@ -14,7 +14,7 @@
 
 ;; NUL prefix makes this key impossible to produce from a service name.
 (local nul (string.char 0))
-(local warm-lock-key (.. nul "ladon:warming"))
+(local warm-lock-key (.. nul "uplink:warming"))
 (local warm-lock-ttl 60)  ;; seconds; expires so a crash doesn't block future warms
 
 (fn make-thunk [service]
@@ -32,7 +32,7 @@
 ;; Others find the lock present and skip — shared dict already has the data.
 (fn warm-callback [premature cfg]
   (when (not premature)
-    (let [d (. ngx.shared :ladon_cache)
+    (let [d (. ngx.shared :uplink_cache)
           (won _) (d:add warm-lock-key true warm-lock-ttl)]
       (when won
         (each [_ service (ipairs cfg.services)]
