@@ -23,8 +23,11 @@ jobs:
 
       - name: Install test dependencies
         run: |
+          sudo apt-get install -y libyaml-dev
           sudo luarocks install busted
           sudo luarocks install dkjson
+          sudo luarocks install lyaml
+          sudo luarocks install lua-resty-openssl
 
       - name: Compile Fennel → Lua
         run: make

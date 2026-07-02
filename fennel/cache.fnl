@@ -19,10 +19,12 @@
 (local json (require :cjson))
 (local semaphore-mod (require :ngx.semaphore))
 
+(var _dict nil)
 (fn get-dict []
-  (let [d (. ngx.shared :ladon_cache)]
-    (assert d "lua_shared_dict 'ladon_cache' not defined in nginx.conf")
-    d))
+  (when (not _dict)
+    (set _dict (assert (. ngx.shared :ladon_cache)
+                       "lua_shared_dict 'ladon_cache' not defined in nginx.conf")))
+  _dict)
 
 ;; NUL byte via string.char avoids Fennel lexer issues with \0 escapes.
 ;; Keys containing NUL cannot be produced from service names (valid URL segments).

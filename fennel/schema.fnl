@@ -2,12 +2,16 @@
 (local json (require :cjson))
 (local rules-mod (require :rules))
 (local metrics (require :metrics))
+(local mtls (require :mtls))
+
+;; lyaml is optional; YAML schema URLs fail gracefully when absent.
+(local (lyaml-ok lyaml) (pcall require :lyaml))
 
 (local http-methods
   {:get true :post true :put true :delete true
    :patch true :options true :head true :trace true})
 
-(local fetch-timeout-ms 5000)
+(local schema-fetch-timeout-ms 5000)
 (local keepalive-timeout-ms 10000)
 (local keepalive-pool-size 10)
 
@@ -18,7 +22,7 @@
   (let [cc (or (. headers :cache-control) (. headers "Cache-Control"))]
     (if cc
       (let [smaxage (cc:match "s%-maxage=(%d+)")
-            maxage  (cc:match "max%-age=(%d+)")]
+            maxage (cc:match "max%-age=(%d+)")]
         (if smaxage
           (tonumber smaxage)
           (if maxage
@@ -31,18 +35,50 @@
             (when ts
               (math.max 0 (math.floor (- ts (ngx.now)))))))))))
 
-(fn fetch [url]
-  (let [client (http.new)
-        _ (client:set_timeout fetch-timeout-ms)
-        (res err) (client:request_uri url {:method :GET :ssl_verify false})]
-    (if err
-      (do (client:close) (error (.. "schema fetch failed: " err)))
-      (if (not= res.status 200)
-        (do (client:close) (error (.. "schema fetch returned HTTP " res.status " for " url)))
-        (let [body (json.decode res.body)
-              upstream-ttl (parse-cache-ttl res.headers)]
-          (client:set_keepalive keepalive-timeout-ms keepalive-pool-size)
-          {:body body :upstream-ttl upstream-ttl})))))
+(fn yaml? [url content-type]
+  (or (url:match "%.ya?ml$")
+      (and content-type (content-type:find "yaml" 1 true))))
+
+(fn parse-body [url content-type raw]
+  (if (yaml? url content-type)
+    (if lyaml-ok
+      (lyaml.load raw)
+      (error (.. "YAML schema at " url " requires lyaml (not installed)")))
+    (json.decode raw)))
+
+;; Fetch schema URL, optionally using mTLS client when service.tls.cert is set.
+(fn fetch [service]
+  (let [url service.schema_url
+        timeout (or service.timeout schema-fetch-timeout-ms)
+        tls service.tls
+        use-mtls (and tls (or tls.cert tls.key))]
+    (if use-mtls
+      (let [(ok result) (pcall mtls.request
+                          {:url url :method "GET" :timeout timeout
+                           :service-name service.name :tls tls})]
+        (if (not ok)
+          (error (.. "schema fetch failed (mTLS): " result))
+          (if (not= result.status 200)
+            (error (.. "schema fetch returned HTTP " result.status " for " url))
+            (let [ct (or (. result.headers "content-type") "")
+                  body (parse-body url ct result.body)
+                  upstream-ttl (parse-cache-ttl result.headers)]
+              {:body body :upstream-ttl upstream-ttl}))))
+      ;; Standard path
+      (let [client (http.new)
+            _ (client:set_timeout timeout)
+            ssl-verify (and tls tls.verify)
+            (res err) (client:request_uri url {:method :GET :ssl_verify (or ssl-verify false)})]
+        (if err
+          (do (client:close) (error (.. "schema fetch failed: " err)))
+          (if (not= res.status 200)
+            (do (client:close)
+                (error (.. "schema fetch returned HTTP " res.status " for " url)))
+            (let [ct (or (. res.headers :content-type) "")
+                  body (parse-body url ct res.body)
+                  upstream-ttl (parse-cache-ttl res.headers)]
+              (client:set_keepalive keepalive-timeout-ms keepalive-pool-size)
+              {:body body :upstream-ttl upstream-ttl})))))))
 
 (fn rewrite-ref-str [service-name ref]
   (let [prefix "#/components/"]
@@ -51,7 +87,7 @@
             slash (rest:find "/" 1 true)]
         (if slash
           (let [section (rest:sub 1 (- slash 1))
-                name    (rest:sub (+ slash 1))]
+                name (rest:sub (+ slash 1))]
             (.. prefix section "/" service-name "__" name))
           ref))
       ref)))
@@ -65,8 +101,6 @@
   obj)
 
 ;; Prefix all component names with service name and compute content hashes.
-;; Hashes are pre-computed here (once at fetch time) so dedup in the aggregator
-;; avoids re-encoding and re-hashing on every /openapi.json request.
 ;; Returns {:components {section {name schema}} :hashes {section {name md5}}}.
 (fn prefix-components [service-name components]
   (let [out {}
@@ -99,28 +133,27 @@
     filtered))
 
 ;; Returns {:openapi :info :paths :components :component-hashes :upstream-ttl}.
-;; component-hashes are pre-computed MD5s used by dedup to avoid re-encoding.
 (fn process [service]
-  (let [(ok result) (pcall fetch service.schema_url)]
+  (let [(ok result) (pcall fetch service)]
     (if (not ok)
       (do
         (metrics.schema-fetch service.name :error)
         (error result))
       (let [{:body raw :upstream-ttl upstream-ttl} result
-            paths      (filter-paths service (or raw.paths {}))
-            _          (rewrite-refs! service.name paths)
+            paths (filter-paths service (or raw.paths {}))
+            _ (rewrite-refs! service.name paths)
             {:components components :hashes hashes}
-                       (prefix-components service.name (or raw.components {}))]
+            (prefix-components service.name (or raw.components {}))]
         (metrics.schema-fetch service.name :ok)
-        {:openapi           raw.openapi
-         :info              raw.info
-         :paths             paths
-         :components        components
-         :component-hashes  hashes
-         :upstream-ttl      upstream-ttl}))))
+        {:openapi raw.openapi
+         :info raw.info
+         :paths paths
+         :components components
+         :component-hashes hashes
+         :upstream-ttl upstream-ttl}))))
 
 {:fetch fetch
  :process process
  :parse-cache-ttl parse-cache-ttl
  :rewrite-ref-str rewrite-ref-str
- :rewrite-refs!   rewrite-refs!}
+ :rewrite-refs! rewrite-refs!}

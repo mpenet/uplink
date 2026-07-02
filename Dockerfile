@@ -1,6 +1,9 @@
 FROM openresty/openresty:alpine-fat AS builder
 
-RUN luarocks install fennel
+RUN apk add --no-cache libyaml-dev
+RUN luarocks install fennel && \
+    luarocks install lyaml && \
+    luarocks install lua-resty-openssl
 ENV PATH="/usr/local/openresty/luajit/bin:${PATH}"
 
 WORKDIR /build
@@ -13,9 +16,15 @@ RUN mkdir -p lib && \
 
 FROM openresty/openresty:alpine
 
-WORKDIR /ladon
+# libyaml runtime library (lyaml .so links against it)
+RUN apk add --no-cache libyaml
 
-COPY --from=builder /build/lib/ lib/
+# Copy compiled Lua modules from builder (lyaml .so + lua-resty-openssl pure Lua)
+COPY --from=builder /usr/local/openresty/luajit/share/lua/ /usr/local/openresty/luajit/share/lua/
+COPY --from=builder /usr/local/openresty/luajit/lib/lua/ /usr/local/openresty/luajit/lib/lua/
+COPY --from=builder /build/lib/ /ladon/lib/
+
+WORKDIR /ladon
 COPY conf/nginx.conf conf/nginx.conf
 RUN mkdir -p logs
 
