@@ -2,12 +2,39 @@
 
 ## Docker
 
+### Build
+
 ```sh
 docker build -t ladon .
+```
+
+The Dockerfile uses a two-stage build:
+
+1. **Builder** (`openresty/openresty:alpine-fat`) — installs Fennel and lyaml via LuaRocks, compiles all `fennel/*.fnl` modules to `lib/*.lua`, and compiles `fennel/generate.fnl` to `generate.lua`.
+2. **Runtime** (`openresty/openresty:alpine`) — copies compiled Lua from the builder, the nginx config, and the entrypoint. No build tools in the final image.
+
+What is baked into the image:
+- Compiled Lua modules (`lib/`)
+- `generate.lua` (the nginx config generator)
+- `nginx/nginx.conf`
+
+What must be mounted at runtime:
+- `config.json` — service definitions (required)
+- TLS certificates, if using mTLS upstream or server TLS
+
+### Run
+
+```sh
 docker run -p 8080:8080 -v ./config.json:/ladon/config.json ladon
 ```
 
-The entrypoint runs `generate.lua`, validates with `nginx -t`, then starts OpenResty. Override the config path with `LADON_CONFIG`:
+On startup the entrypoint:
+1. Reads `config.json` (or `$LADON_CONFIG`) — exits with an error if missing
+2. Runs `luajit generate.lua` — writes `nginx/upstreams.conf`, `nginx/locations.conf`, `nginx/listen.conf`
+3. Validates the generated config with `openresty -t`
+4. Starts OpenResty in the foreground
+
+### Custom config path
 
 ```sh
 docker run -p 8080:8080 \
@@ -16,7 +43,7 @@ docker run -p 8080:8080 \
   ladon
 ```
 
-Mount certs for mTLS:
+### Upstream mTLS
 
 ```sh
 docker run -p 8080:8080 \
@@ -25,11 +52,41 @@ docker run -p 8080:8080 \
   ladon
 ```
 
-Hot-reload inside a running container:
+Cert paths in `config.json` must match the mount point inside the container.
+
+### Server TLS
+
+Expose port 8443 and mount the server certificate:
+
+```sh
+docker run -p 8080:8080 -p 8443:8443 \
+  -v ./config.json:/ladon/config.json \
+  -v ./certs:/certs:ro \
+  ladon
+```
+
+`server.tls` in `config.json` must reference absolute paths inside the container (e.g. `/certs/server.crt`).
+
+### Hot reload
 
 ```sh
 docker exec <container> curl -s -X POST http://127.0.0.1:8080/reload
 ```
+
+This re-reads `config.json` and applies rate limits, circuit breaker thresholds, schema rules, and header config without restarting nginx. For upstream or TLS changes, rebuild the image or re-run the container (the entrypoint re-generates nginx config on every start).
+
+### Custom nginx.conf
+
+To override shared dict sizes, log format, or other nginx settings:
+
+```sh
+docker run -p 8080:8080 \
+  -v ./config.json:/ladon/config.json \
+  -v ./nginx/nginx.conf:/ladon/nginx/nginx.conf \
+  ladon
+```
+
+Use [`nginx/nginx.conf.sample`](../nginx/nginx.conf.sample) as a starting point.
 
 ## Docker Compose
 
