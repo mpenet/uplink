@@ -21,6 +21,11 @@
 (local circuit (require :circuit))
 (local ratelimit (require :ratelimit))
 (local metrics (require :metrics))
+(local otel (require :otel))
+
+;; Evaluated once per worker at module load. If ladon_otel dict is absent from
+;; nginx.conf this is nil and the log phase skips otel at zero cost.
+(local otel-enabled (not= nil (. ngx.shared :ladon_otel)))
 
 ;; Per-worker service lookup table, rebuilt only when config version changes.
 (var services-by-name {})
@@ -118,6 +123,8 @@
         (metrics.proxy-request svc-name)
         (metrics.observe-latency svc-name duration)
         (when (>= ngx.status 500)
-          (metrics.proxy-error svc-name ngx.status))))))
+          (metrics.proxy-error svc-name ngx.status))
+        (when otel-enabled
+          (otel.push! svc-name))))))
 
 {:access access :on_response on-response :log log}

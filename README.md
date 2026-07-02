@@ -368,6 +368,48 @@ The `/reload` endpoint is restricted to loopback (`127.0.0.1` / `::1`).
 
 Proxied requests carry: `traceparent` (W3C, propagated or generated), `X-Request-ID`, `X-Forwarded-For`, `X-Forwarded-Proto`.
 
+## OpenTelemetry
+
+Ladon exports spans via OTLP/HTTP+JSON. Disabled at zero cost by default — no overhead unless both prerequisites are present.
+
+### Enabling
+
+**1. Add the shared dict to `nginx/nginx.conf`:**
+
+```nginx
+lua_shared_dict ladon_otel 2m;
+```
+
+**2. Add `otel` to `config.json`:**
+
+```json
+"otel": {
+  "endpoint":     "http://otel-collector:4318/v1/traces",
+  "service_name": "ladon",
+  "batch_size":   100,
+  "flush_interval": 5
+}
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `endpoint` | — | OTLP/HTTP collector URL (required) |
+| `service_name` | `"ladon"` | `service.name` resource attribute |
+| `batch_size` | `100` | Max spans per HTTP POST |
+| `flush_interval` | `5` | Flush timer interval in seconds |
+
+### How it works
+
+Each proxied request produces one span in the log phase. Spans are written to `ladon_otel` shared dict (ring buffer, 1000 slots). A per-worker timer fires every `flush_interval` seconds and POSTs pending spans as OTLP/HTTP+JSON.
+
+- **traceId** — taken from the incoming W3C `traceparent` if valid, otherwise `$request_id`
+- **spanId** — first 16 chars of `$request_id` (same value forwarded upstream in traceparent)
+- **parentSpanId** — parent span from incoming `traceparent`, absent if no upstream trace context
+
+Trace continuity relies on upstream services propagating `traceparent`. Ladon always injects or generates one in the access phase.
+
+Span export is best-effort: if the collector is down, spans are dropped after `batch_size` slots fill the buffer. `ladon_otel` size controls buffer capacity (default `2m` holds ~1000 spans).
+
 ## Access log
 
 Every request is logged to `logs/access.log` as a JSON line:

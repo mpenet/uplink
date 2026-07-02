@@ -95,6 +95,7 @@
 (local config-dict (make-shared-dict))
 (local circuit-dict (make-shared-dict))
 (local ratelimit-dict (make-shared-dict))
+(local otel-dict (make-shared-dict))
 
 ;; ── Global ngx mock ───────────────────────────────────────────────────────────
 
@@ -108,7 +109,8 @@
    :read_body (fn [] nil)
    :get_body_data (fn [] nil)
    :set_header (fn [k v] (tset _req_headers k v))
-   :clear_header (fn [k] (tset _req_headers k nil))})
+   :clear_header (fn [k] (tset _req_headers k nil))
+   :start_time (fn [] (os.time))})
 
 (fn make-resp-header-proxy []
   (setmetatable {}
@@ -121,10 +123,13 @@
             :ladon_metrics metrics-dict
             :ladon_config config-dict
             :ladon_circuit circuit-dict
-            :ladon_ratelimit ratelimit-dict}
+            :ladon_ratelimit ratelimit-dict
+            :ladon_otel otel-dict}
    :log (fn [& _] nil)
    :now (fn [] (os.time))
    :md5 (fn [s] (string.format "%d:%s:%s" (# s) (s:sub 1 1) (s:sub -1)))
+   ;; Encode bytes as lowercase hex — not real base64 but deterministic for tests.
+   :encode_base64 (fn [s] (s:gsub "." (fn [c] (string.format "%02x" (string.byte c)))))
    :var {:request_id "abcdef0123456789abcdef0123456789"
          :uri "/users/v1/profile"
          :request_uri "/users/v1/profile"
@@ -145,7 +150,7 @@
 
 (set _G._mock_dicts
   {:cache cache-dict :metrics metrics-dict :config config-dict
-   :circuit circuit-dict :ratelimit ratelimit-dict})
+   :circuit circuit-dict :ratelimit ratelimit-dict :otel otel-dict})
 
 (fn reset-http []
   (set http-response {:status 200 :headers {"content-type" "application/json"} :body "{}"})
@@ -164,6 +169,7 @@
     (config-dict:_reset)
     (circuit-dict:_reset)
     (ratelimit-dict:_reset)
+    (otel-dict:_reset)
     (reset-http)
     (set rl-delay 0)
     (set _last_exit nil)
@@ -179,4 +185,6 @@
                        :upstream_host_header ""
                        :upstream_response_time "0.042"
                        :traceparent ""})
-    (tset _G.ngx :req (make-req))))
+    (tset _G.ngx :req (make-req))
+    (tset _G.ngx :encode_base64
+      (fn [s] (s:gsub "." (fn [c] (string.format "%02x" (string.byte c))))))))
