@@ -339,33 +339,6 @@ To update rules/rate limits/circuit breaker without restarting: update the Confi
 
 Override by mounting a custom `nginx/nginx.conf`.
 
-## Project layout
-
-```
-config.json              — service definitions
-Makefile                 — compile, generate, run, reload, stop, test
-nginx/
-  nginx.conf             — static OpenResty skeleton (includes generated files)
-  entrypoint.sh          — Docker entrypoint: generate → validate → start nginx
-  upstreams.conf         — generated: one upstream{} block per service
-  locations.conf         — generated: one location block per service
-fennel/
-  generate.fnl           — generates nginx/upstreams.conf + nginx/locations.conf
-  config.fnl             — load/validate config.json; shared-dict persistence
-  router.fnl             — access/header_filter/log phase handlers
-  rules.fnl              — path/method/tag filter predicates
-  schema.fnl             — fetch schemas, resolve $refs, prefix components
-  aggregator.fnl         — merge schemas, dedup components, serve /openapi.json
-  cache.fnl              — TTL cache with semaphore and stale fallback
-  refresh.fnl            — background refresh timers and startup pre-warm
-  circuit.fnl            — 2-state circuit breaker
-  ratelimit.fnl          — leaky-bucket rate limiting
-  metrics.fnl            — Prometheus counters and latency histogram
-lib/                     — compiled Lua (output of make)
-test/                    — busted test suite
-logs/                    — nginx logs
-```
-
 ## Makefile targets
 
 ```sh
