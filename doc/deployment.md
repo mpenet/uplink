@@ -85,7 +85,7 @@ This re-reads `config.json` and applies rate limits, circuit breaker thresholds,
 
 ### Custom nginx.conf
 
-To override shared dict sizes, log format, or other nginx settings:
+To override shared dict sizes or other nginx settings:
 
 ```sh
 docker run -p 8080:8080 \

@@ -15,7 +15,7 @@
 
 ## Access log
 
-Every request is logged to `logs/access.log` as a JSON line:
+Every request is logged to **stdout** as a JSON line. Error log goes to **stderr**.
 
 ```json
 {"time":"2026-07-02T10:00:00+00:00","service":"users","method":"GET","path":"/users/v1/profile","query":"","status":200,"upstream_time":"0.042","bytes":312,"traceparent":"00-abc...","request_id":"abcdef01...","remote_addr":"10.0.0.1","upstream_addr":"10.0.0.2:8080"}
@@ -28,8 +28,6 @@ Every request is logged to `logs/access.log` as a JSON line:
 | `traceparent` | W3C traceparent, propagated or generated in the access phase |
 | `request_id` | nginx `$request_id` — 32 hex characters, unique per request |
 | `upstream_addr` | Actual upstream server used (`""` for non-proxied locations) |
-
-Override the log path or format by mounting a custom `nginx/nginx.conf`.
 
 ## OpenTelemetry
 
