@@ -1,0 +1,108 @@
+{
+  "server": {
+    "tls": {
+      "cert": "/certs/server.crt",
+      "key": "/certs/server.key",
+      "client_ca": "/certs/ca.crt",
+      "verify_client": "on",
+      "port": 8443
+    }
+  },
+
+  "services": [
+    {
+      "name": "users",
+      "upstream": "http://users-svc:8080",
+      "schema_url": "http://users-svc:8080/openapi.json",
+      "ttl": 300,
+      "timeout": 10000,
+
+      "rules": {
+        "include_paths": ["*"],
+        "include_tags": [],
+        "include_methods": ["GET", "POST", "PUT", "DELETE", "PATCH"],
+        "exclude_paths": ["/internal/*", "/debug/*"]
+      },
+
+      "rate_limit": {
+        "requests_per_second": 500,
+        "burst": 100
+      },
+
+      "circuit_breaker": {
+        "threshold": 5,
+        "open_ttl": 30
+      },
+
+      "headers": {
+        "request": {
+          "set":   {"X-Tenant": "acme", "X-Service-Version": "2"},
+          "strip": ["X-Internal-Token", "X-Debug"]
+        },
+        "response": {
+          "set":   {"X-Gateway": "ladon"},
+          "strip": ["X-Powered-By", "Server"]
+        }
+      },
+
+      "cors": {
+        "origins": ["https://app.example.com", "https://admin.example.com"],
+        "methods": ["GET", "POST", "PUT", "DELETE"],
+        "headers": ["Authorization", "Content-Type"],
+        "max_age": 3600,
+        "credentials": true
+      }
+    },
+
+    {
+      "name": "orders",
+      "upstream": [
+        {"url": "http://orders-1:9090", "weight": 3},
+        {"url": "http://orders-2:9090", "weight": 1, "max_fails": 3, "fail_timeout": "30s"}
+      ],
+      "schema_url": "http://orders-1:9090/openapi.json",
+      "ttl": 60,
+      "balancing": "least_conn",
+      "host_header": "orders.internal",
+
+      "rules": {
+        "include_paths": ["/v2/*"],
+        "include_tags": ["orders"],
+        "include_methods": ["GET", "POST"],
+        "exclude_paths": []
+      },
+
+      "keepalive": {
+        "pool_size": 64,
+        "requests": 2000,
+        "timeout": "120s"
+      },
+
+      "tls": {
+        "cert": "/certs/orders-client.crt",
+        "key": "/certs/orders-client.key",
+        "verify": true
+      }
+    },
+
+    {
+      "name": "notifications",
+      "upstream": "http://notif-svc:8080",
+      "schema_url": "http://notif-svc:8080/openapi.json",
+      "ttl": 120,
+      "websocket": true,
+
+      "rules": {
+        "include_paths": ["*"],
+        "include_tags": [],
+        "include_methods": ["GET", "POST"],
+        "exclude_paths": []
+      },
+
+      "nginx_directives": [
+        "proxy_buffer_size 16k",
+        "proxy_buffers 4 16k"
+      ]
+    }
+  ]
+}

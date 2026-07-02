@@ -48,5 +48,5 @@ test: all $(TEST_OUT)
 
 clean:
 	rm -f lib/*.lua generate.lua
-	rm -f nginx/upstreams.conf nginx/locations.conf
+	rm -f nginx/upstreams.conf nginx/locations.conf nginx/listen.conf
 	rm -f logs/*.log logs/*.pid

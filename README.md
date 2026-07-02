@@ -115,9 +115,37 @@ Applied as **include\_paths ∩ include\_methods ∩ include\_tags − exclude\_
 | `include_tags` | `[]` | Tag whitelist. Empty = tag filter disabled |
 | `exclude_paths` | `[]` | Blacklist applied after includes |
 
-### mTLS
+### Server TLS and mTLS
 
-When `tls.cert` and `tls.key` are set, Ladon presents the client certificate for both proxied requests and schema fetches:
+Configure inbound TLS (and optionally client-certificate verification) with a top-level `server.tls` block:
+
+```json
+{
+  "server": {
+    "tls": {
+      "cert": "/certs/server.crt",
+      "key":  "/certs/server.key",
+      "client_ca":     "/certs/ca.crt",
+      "verify_client": "on"
+    }
+  },
+  "services": [...]
+}
+```
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `cert` | yes | — | Server certificate path |
+| `key` | yes | — | Server private key path |
+| `client_ca` | no | — | CA certificate for verifying client certs. Setting this enables mTLS |
+| `verify_client` | no | `"on"` when `client_ca` set | nginx `ssl_verify_client` value: `"on"`, `"optional"`, `"off"` |
+| `port` | no | `8443` | HTTPS listen port. Plain HTTP on `8080` is always active |
+
+`make generate && make reload` is required after any change. TLS uses TLS 1.2/1.3 with a modern cipher suite. Paths must be absolute and accessible inside the container.
+
+### mTLS upstream
+
+When `tls.cert` and `tls.key` are set on a service, Ladon presents the client certificate for both proxied requests and schema fetches:
 
 ```json
 "tls": {
@@ -319,6 +347,7 @@ Re-reads and validates `config.json`, bumps the config version. Workers pick up 
 
 **Requires `make generate && make reload`**:
 - `upstream`, `balancing`, `tls`, `timeout`, `host_header`, `keepalive`, `websocket` changes
+- `server.tls` changes
 - Adding or removing services
 - `nginx_directives` changes
 - `cors` changes
@@ -338,6 +367,24 @@ The `/reload` endpoint is restricted to loopback (`127.0.0.1` / `::1`).
 `X-Ladon-Degraded: svc1,svc2` is set on `/openapi.json` responses when one or more services have no usable schema.
 
 Proxied requests carry: `traceparent` (W3C, propagated or generated), `X-Request-ID`, `X-Forwarded-For`, `X-Forwarded-Proto`.
+
+## Access log
+
+Every request is logged to `logs/access.log` as a JSON line:
+
+```json
+{"time":"2026-07-02T10:00:00+00:00","service":"users","method":"GET","path":"/users/v1/profile","query":"","status":200,"upstream_time":"0.042","bytes":312,"traceparent":"00-abc...","request_id":"abcdef01...","remote_addr":"10.0.0.1","upstream_addr":"10.0.0.2:8080"}
+```
+
+| Field | Description |
+|-------|-------------|
+| `service` | Service name from `$svc_name` (`""` for `/healthz`, `/openapi.json`, etc.) |
+| `upstream_time` | `proxy_upstream_response_time` in seconds (`""` for non-proxied locations) |
+| `traceparent` | W3C traceparent, propagated or generated in the access phase |
+| `request_id` | nginx `$request_id` — 32 hex characters, unique per request |
+| `upstream_addr` | Actual upstream server used (`""` for non-proxied locations) |
+
+Override the log path by mounting a custom `nginx/nginx.conf`.
 
 ## Metrics
 
