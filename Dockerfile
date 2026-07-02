@@ -1,6 +1,13 @@
 FROM openresty/openresty:alpine-fat AS builder
 
-RUN apk add --no-cache libyaml-dev
+# Build libyaml from source — not available in openresty:alpine-fat repos.
+# alpine-fat includes build-base (gcc, make) already.
+RUN apk add --no-cache wget && \
+    wget -q https://pyyaml.org/download/libyaml/yaml-0.2.5.tar.gz && \
+    tar xzf yaml-0.2.5.tar.gz && \
+    cd yaml-0.2.5 && ./configure --prefix=/usr && make && make install && \
+    cd .. && rm -rf yaml-0.2.5 yaml-0.2.5.tar.gz
+
 RUN luarocks install fennel && luarocks install lyaml
 ENV PATH="/usr/local/openresty/luajit/bin:${PATH}"
 
@@ -19,9 +26,8 @@ RUN fennel --compile fennel/generate.fnl > generate.lua
 
 FROM openresty/openresty:alpine
 
-# lyaml .so and its libyaml runtime dependency — both from builder.
-# openresty:alpine doesn't carry libyaml in its repos; copying the .so avoids
-# needing to install anything.
+# Copy libyaml runtime .so and lyaml Lua rock from builder.
+# Neither is available in openresty:alpine repos so we bundle them directly.
 COPY --from=builder /usr/lib/libyaml*.so* /usr/lib/
 COPY --from=builder /usr/local/openresty/luajit/share/lua/ /usr/local/openresty/luajit/share/lua/
 COPY --from=builder /usr/local/openresty/luajit/lib/lua/ /usr/local/openresty/luajit/lib/lua/
@@ -35,7 +41,4 @@ RUN chmod +x nginx/entrypoint.sh && mkdir -p logs nginx
 
 EXPOSE 8080
 
-# Entrypoint generates nginx/upstreams.conf + nginx/locations.conf from
-# config.json, validates, then starts nginx.
-# Mount config at runtime: docker run -v ./config.json:/uplink/config.json uplink
 ENTRYPOINT ["nginx/entrypoint.sh"]
