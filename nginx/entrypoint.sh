@@ -11,6 +11,13 @@ fi
 
 cd /uplink
 
+RESOLVER=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf)
+if [ -z "$RESOLVER" ]; then
+  echo "error: could not determine DNS resolver from /etc/resolv.conf" >&2
+  exit 1
+fi
+echo "resolver ${RESOLVER} valid=30s ipv6=off;" > nginx/resolver.conf
+
 echo "generating nginx config from $CONFIG..."
 luajit generate.lua
 

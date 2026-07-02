@@ -8,7 +8,7 @@ RUN apk add --no-cache wget && \
     cd yaml-0.2.5 && ./configure --prefix=/usr && make && make install && \
     cd .. && rm -rf yaml-0.2.5 yaml-0.2.5.tar.gz
 
-RUN luarocks install fennel && luarocks install lyaml
+RUN luarocks install fennel && luarocks install lyaml && luarocks install dkjson && luarocks install lua-resty-http
 ENV PATH="/usr/local/openresty/luajit/bin:${PATH}"
 
 WORKDIR /build

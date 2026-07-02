@@ -138,9 +138,9 @@
         (set agg-body (json.encode doc))
         (set agg-degraded degraded)
         (set agg-gen gen)))
-    (ngx.header.content_type "application/json; charset=utf-8")
+    (tset ngx.header :content_type "application/json; charset=utf-8")
     (when (> (# agg-degraded) 0)
-      (ngx.header.x_uplink_degraded (table.concat agg-degraded ",")))
+      (tset ngx.header :x_uplink_degraded (table.concat agg-degraded ",")))
     (ngx.say agg-body)))
 
 {:build build

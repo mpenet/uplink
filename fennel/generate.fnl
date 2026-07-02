@@ -45,7 +45,14 @@
       (if (= (type u) :string) {:url u} u))))
 
 (fn upstream-addr [url]
-  (or (url:match "^https?://([^/]+)") url))
+  (let [host (url:match "^https?://([^/]+)")]
+    (if (not host)
+      url
+      ;; No explicit port on an https URL → default to 443 so nginx doesn't
+      ;; connect on port 80 and then try SSL on it.
+      (if (and (url:match "^https://") (not (host:match ":")))
+        (.. host ":443")
+        host))))
 
 (fn first-upstream-url [svc]
   (. (upstream-entries svc) 1 :url))
@@ -147,7 +154,10 @@
       (when (and svc.tls svc.tls.key)
         (table.insert buf (.. "    proxy_ssl_certificate_key " svc.tls.key ";\n")))
       (let [verify (and svc.tls svc.tls.verify)]
-        (table.insert buf (.. "    proxy_ssl_verify          " (if verify "on" "off") ";\n"))))
+        (table.insert buf (.. "    proxy_ssl_verify          " (if verify "on" "off") ";\n")))
+      ;; Send SNI so CDN/vhost upstreams can route to the correct certificate.
+      (table.insert buf (.. "    proxy_ssl_server_name     on;\n"))
+      (table.insert buf (.. "    proxy_ssl_name            \"" host-hdr "\";\n")))
     (table.insert buf (.. "    proxy_connect_timeout     " timeout-s "s;\n"))
     (table.insert buf (.. "    proxy_read_timeout        " timeout-s "s;\n"))
     (table.insert buf (.. "    proxy_send_timeout        " timeout-s "s;\n"))

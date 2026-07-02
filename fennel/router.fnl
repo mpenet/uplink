@@ -119,7 +119,8 @@
   (let [svc-name ngx.var.svc_name
         service (get-service svc-name)]
     (when service
-      (let [duration (tonumber (or ngx.var.upstream_response_time "0"))]
+      (let [raw (or ngx.var.upstream_response_time "0")
+            duration (or (tonumber raw) (tonumber (raw:match "([%d%.]+)")) 0)]
         (metrics.proxy-request svc-name)
         (metrics.observe-latency svc-name duration)
         (when (>= ngx.status 500)
