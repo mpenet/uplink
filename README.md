@@ -1,5 +1,8 @@
 # Ladon
 
+<img width="200" height="200"  src="https://github.com/user-attachments/assets/f1bf8013-b7d9-4835-9be5-a6f8cc1ec792" />
+
+
 OpenResty + Fennel API gateway that aggregates multiple upstream OpenAPI 3.x services under a single endpoint. Each service is exposed under a `/name` prefix; a merged `/openapi.json` covers all of them.
 
 Proxying runs entirely through native nginx `proxy_pass` — keepalive pools, TLS, body streaming, and retries happen at C speed with no Lua on the hot path. Lua runs only in the access phase (rate limiting, circuit breaker, traceparent injection) and the log phase (metrics, OTel spans).
