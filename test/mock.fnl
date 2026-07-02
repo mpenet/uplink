@@ -99,6 +99,21 @@
 ;; ── Global ngx mock ───────────────────────────────────────────────────────────
 
 (var _last_exit nil)
+(var _req_headers {"content-type" "application/json"})
+(var _resp_headers {})
+
+(fn make-req []
+  {:get_headers (fn [] _req_headers)
+   :get_method (fn [] "GET")
+   :read_body (fn [] nil)
+   :get_body_data (fn [] nil)
+   :set_header (fn [k v] (tset _req_headers k v))
+   :clear_header (fn [k] (tset _req_headers k nil))})
+
+(fn make-resp-header-proxy []
+  (setmetatable {}
+    {:__newindex (fn [_ k v] (tset _resp_headers k v))
+     :__index (fn [_ k] (. _resp_headers k))}))
 
 (set _G.ngx
   {:INFO 6 :WARN 5 :ERR 3
@@ -118,11 +133,8 @@
          :upstream_host_header ""
          :upstream_response_time "0.042"
          :traceparent ""}
-   :req {:get_headers (fn [] {"content-type" "application/json"})
-         :get_method (fn [] "GET")
-         :read_body (fn [] nil)
-         :get_body_data (fn [] nil)}
-   :header (setmetatable {} {:__newindex (fn [] nil)})
+   :req (make-req)
+   :header (make-resp-header-proxy)
    :status 200
    :say (fn [_] nil)
    :print (fn [_] nil)
@@ -155,7 +167,10 @@
     (reset-http)
     (set rl-delay 0)
     (set _last_exit nil)
+    (set _req_headers {"content-type" "application/json"})
+    (set _resp_headers {})
     (tset _G.ngx :status 200)
+    (tset _G.ngx :header (make-resp-header-proxy))
     (tset _G.ngx :var {:request_id "abcdef0123456789abcdef0123456789"
                        :uri "/users/v1/profile"
                        :request_uri "/users/v1/profile"
@@ -164,8 +179,4 @@
                        :upstream_host_header ""
                        :upstream_response_time "0.042"
                        :traceparent ""})
-    (tset _G.ngx :req
-      {:get_headers (fn [] {"content-type" "application/json"})
-       :get_method (fn [] "GET")
-       :read_body (fn [] nil)
-       :get_body_data (fn [] nil)})))
+    (tset _G.ngx :req (make-req))))

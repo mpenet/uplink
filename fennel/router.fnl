@@ -81,7 +81,16 @@
       (metrics.circuit-open svc-name)
       (set ngx.status 503)
       (ngx.say "{\"error\":\"service unavailable (circuit open)\"}")
-      (ngx.exit 503))))
+      (ngx.exit 503))
+    ;; Request header manipulation — set/strip before forwarding upstream.
+    (let [hdrs (and service.headers service.headers.request)]
+      (when hdrs
+        (when hdrs.set
+          (each [k v (pairs hdrs.set)]
+            (ngx.req.set_header k v)))
+        (when hdrs.strip
+          (each [_ k (ipairs hdrs.strip)]
+            (ngx.req.clear_header k)))))))
 
 ;; Called by header_filter_by_lua_block — ngx.status is the upstream status.
 (fn on-response []
@@ -89,7 +98,16 @@
     (when service
       (if (>= ngx.status 500)
         (circuit.on-failure! service)
-        (circuit.on-success! service)))))
+        (circuit.on-success! service))
+      ;; Response header manipulation — set/strip before returning to client.
+      (let [hdrs (and service.headers service.headers.response)]
+        (when hdrs
+          (when hdrs.set
+            (each [k v (pairs hdrs.set)]
+              (tset ngx.header k v)))
+          (when hdrs.strip
+            (each [_ k (ipairs hdrs.strip)]
+              (tset ngx.header k nil))))))))
 
 ;; Called by log_by_lua_block — upstream_response_time available here.
 (fn log []

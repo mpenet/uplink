@@ -99,6 +99,45 @@
         (router.on_response)
         (assert.is_nil (_mock_dicts.circuit:get "cb:users:state"))))))
 
+(describe "router.access header manipulation"
+  (fn []
+    (it "injects request headers upstream"
+      (fn []
+        (load-service (make-svc {:headers {:request {:set {"X-Tenant" "acme"}}}}))
+        (tset package.loaded :router nil)
+        (set router (require :router))
+        (router.access)
+        (assert.equals "acme" (. (_G.ngx.req.get_headers) "X-Tenant"))))
+
+    (it "strips request headers before forwarding"
+      (fn []
+        (load-service (make-svc {:headers {:request {:strip ["content-type"]}}}))
+        (tset package.loaded :router nil)
+        (set router (require :router))
+        (router.access)
+        (assert.is_nil (. (_G.ngx.req.get_headers) "content-type"))))))
+
+(describe "router.on_response header manipulation"
+  (fn []
+    (it "injects response headers"
+      (fn []
+        (load-service (make-svc {:headers {:response {:set {"X-Gateway" "ladon"}}}}))
+        (tset package.loaded :router nil)
+        (set router (require :router))
+        (tset _G.ngx :status 200)
+        (router.on_response)
+        (assert.equals "ladon" (. _G.ngx.header "X-Gateway"))))
+
+    (it "strips response headers"
+      (fn []
+        (tset _G.ngx.header "X-Powered-By" "OpenResty")
+        (load-service (make-svc {:headers {:response {:strip ["X-Powered-By"]}}}))
+        (tset package.loaded :router nil)
+        (set router (require :router))
+        (tset _G.ngx :status 200)
+        (router.on_response)
+        (assert.is_nil (. _G.ngx.header "X-Powered-By"))))))
+
 (describe "router.log"
   (fn []
     (it "records proxy_requests_total"

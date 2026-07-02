@@ -88,7 +88,7 @@ make generate && make reload
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `name` | yes | — | Service identifier and route prefix. Only `[a-zA-Z0-9_-]` allowed |
-| `upstream` | yes | — | Base URL to proxy to. Use `https://` for TLS upstreams |
+| `upstream` | yes | — | Upstream URL or array of URLs. Arrays enable nginx round-robin load balancing |
 | `schema_url` | yes | — | URL of the service's OpenAPI 3.x JSON or YAML schema |
 | `ttl` | no | `300` | Schema cache TTL in seconds. Upstream `Cache-Control`/`Expires` takes precedence |
 | `timeout` | no | `30000` | Connect/send/read timeout in milliseconds |
@@ -97,6 +97,10 @@ make generate && make reload
 | `rate_limit` | no | — | Per-service rate limiting (see below) |
 | `circuit_breaker` | no | — | Per-service circuit breaker (see below) |
 | `nginx_directives` | no | — | Extra nginx directives in the generated location block (see below) |
+| `host_header` | no | first upstream host | Host header value sent to upstreams (useful with multiple upstreams) |
+| `keepalive` | no | see below | Upstream keepalive pool settings |
+| `cors` | no | — | CORS configuration (see below) |
+| `headers` | no | — | Request/response header injection and stripping (see below) |
 
 ### Rules
 
@@ -149,6 +153,81 @@ After `threshold` consecutive 5xx responses the circuit opens; all requests get 
 
 State is shared across all workers. Thresholds take effect immediately after `/reload`.
 
+### Keepalive pool
+
+Controls the nginx upstream keepalive pool per service. All three fields are optional.
+
+```json
+"keepalive": {
+  "pool_size": 32,
+  "requests":  1000,
+  "timeout":   "60s"
+}
+```
+
+| Field | Default | nginx directive |
+|-------|---------|-----------------|
+| `pool_size` | `32` | `keepalive N` — max idle connections held open per worker |
+| `requests` | `1000` | `keepalive_requests N` — max requests per connection before it is closed |
+| `timeout` | `"60s"` | `keepalive_timeout T` — how long an idle connection is kept alive |
+
+Changes require `make generate && make reload`.
+
+### Multiple upstreams
+
+Pass an array to `upstream` for nginx round-robin load balancing across multiple servers:
+
+```json
+"upstream": ["http://users-1:8080", "http://users-2:8080", "http://users-3:8080"]
+```
+
+All servers share one keepalive pool. The `Host` header is set to the first upstream's host by default; override with `host_header` if your servers have different hostnames.
+
+nginx's passive failover applies: a server is skipped for the duration of the request on connection error or timeout (`proxy_next_upstream error timeout`).
+
+### CORS
+
+Per-service CORS configuration emitted as nginx `add_header` directives:
+
+```json
+"cors": {
+  "origins": ["https://app.example.com", "https://admin.example.com"],
+  "methods": ["GET", "POST", "PUT", "DELETE"],
+  "headers": ["Authorization", "Content-Type"],
+  "max_age": 3600,
+  "credentials": false
+}
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `origins` | `["*"]` | Allowed origins. `["*"]` emits a literal wildcard. Single origin emits it literally. Multiple specific origins use a nginx `map {}` block for dynamic matching |
+| `methods` | `["GET","POST","OPTIONS"]` | `Access-Control-Allow-Methods` value |
+| `headers` | `["Authorization","Content-Type"]` | `Access-Control-Allow-Headers` value |
+| `max_age` | `3600` | `Access-Control-Max-Age` in seconds |
+| `credentials` | `false` | Emit `Access-Control-Allow-Credentials: true` (incompatible with `origins: ["*"]`) |
+
+OPTIONS preflight requests are short-circuited with a `204` response inside the location block. Changes require `make generate && make reload`.
+
+### Header injection and stripping
+
+Set or remove headers on requests forwarded upstream and on responses returned to clients. Takes effect immediately after `/reload`.
+
+```json
+"headers": {
+  "request": {
+    "set":   {"X-Tenant": "acme", "X-Service-Version": "2"},
+    "strip": ["X-Internal-Token", "X-Debug"]
+  },
+  "response": {
+    "set":   {"X-Gateway": "ladon"},
+    "strip": ["X-Powered-By", "Server"]
+  }
+}
+```
+
+`request.set` / `request.strip` run in the access phase before the request is forwarded. `response.set` / `response.strip` run in the header filter phase before the response is returned to the client.
+
 ### Extra nginx directives
 
 Inject arbitrary directives into a service's location block:
@@ -187,11 +266,13 @@ Re-reads and validates `config.json`, bumps the config version. Workers pick up 
 - Rate limit parameters
 - Circuit breaker parameters
 - Schema TTL
+- Header injection/stripping (`headers.request.*`, `headers.response.*`)
 
 **Requires `make generate && make reload`**:
-- `upstream`, `tls`, `timeout` changes
+- `upstream`, `tls`, `timeout`, `host_header`, `keepalive` changes
 - Adding or removing services
 - `nginx_directives` changes
+- `cors` changes
 
 The `/reload` endpoint is restricted to loopback (`127.0.0.1` / `::1`).
 
