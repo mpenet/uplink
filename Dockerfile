@@ -19,9 +19,10 @@ RUN fennel --compile fennel/generate.fnl > generate.lua
 
 FROM openresty/openresty:alpine
 
-RUN apk add --no-cache libyaml-dev
-
-# lyaml .so from builder
+# lyaml .so and its libyaml runtime dependency — both from builder.
+# openresty:alpine doesn't carry libyaml in its repos; copying the .so avoids
+# needing to install anything.
+COPY --from=builder /usr/lib/libyaml*.so* /usr/lib/
 COPY --from=builder /usr/local/openresty/luajit/share/lua/ /usr/local/openresty/luajit/share/lua/
 COPY --from=builder /usr/local/openresty/luajit/lib/lua/ /usr/local/openresty/luajit/lib/lua/
 COPY --from=builder /build/lib/ /uplink/lib/
