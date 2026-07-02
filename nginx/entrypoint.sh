@@ -11,6 +11,9 @@ fi
 
 cd /uplink
 
+echo "error_log /dev/stderr warn;" > nginx/error-log.conf
+echo "access_log /dev/stdout json_access;" > nginx/access-log.conf
+
 RESOLVER=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf)
 if [ -z "$RESOLVER" ]; then
   echo "error: could not determine DNS resolver from /etc/resolv.conf" >&2
