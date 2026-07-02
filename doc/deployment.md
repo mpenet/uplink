@@ -2,7 +2,15 @@
 
 ## Docker
 
-### Build
+### Prebuilt image
+
+```sh
+docker pull ghcr.io/mpenet/ladon:latest
+```
+
+Images are published to the GitHub Container Registry on every push to `main`. Use a specific tag (e.g. `ghcr.io/mpenet/ladon:0.1.0`) in production rather than `latest`.
+
+### Build from source
 
 ```sh
 docker build -t ladon .

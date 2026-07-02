@@ -17,6 +17,15 @@ Proxying runs entirely through native nginx `proxy_pass` — keepalive pools, TL
 
 ## Quick start
 
+Pull the prebuilt image from the GitHub Container Registry:
+
+```sh
+docker pull ghcr.io/mpenet/ladon:latest
+docker run -p 8080:8080 -v ./config.json:/ladon/config.json ghcr.io/mpenet/ladon:latest
+```
+
+Or build from source:
+
 ```sh
 docker build -t ladon .
 docker run -p 8080:8080 -v ./config.json:/ladon/config.json ladon
