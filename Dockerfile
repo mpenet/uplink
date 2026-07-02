@@ -19,7 +19,7 @@ RUN fennel --compile fennel/generate.fnl > generate.lua
 
 FROM openresty/openresty:alpine
 
-RUN apk add --no-cache libyaml
+RUN apk add --no-cache libyaml-dev
 
 # lyaml .so from builder
 COPY --from=builder /usr/local/openresty/luajit/share/lua/ /usr/local/openresty/luajit/share/lua/
