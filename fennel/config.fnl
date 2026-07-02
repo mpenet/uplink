@@ -13,10 +13,7 @@
   (when (not svc.ttl)
     (set svc.ttl 300))
   (when (not svc.rules)
-    (set svc.rules {:include_paths ["*"]
-                    :include_tags []
-                    :include_methods ["GET" "POST" "PUT" "DELETE" "PATCH"]
-                    :exclude_paths []}))
+    (set svc.rules {}))
   svc)
 
 (fn validate [cfg]

@@ -4,9 +4,7 @@
 (fn make-svc [overrides]
   (let [base {:name "users" :upstream "http://users-svc:8080"
               :schema_url "http://users-svc:8080/openapi.json" :ttl 300
-              :rules {:include_paths ["*"] :include_tags []
-                      :include_methods ["GET" "POST" "PUT" "DELETE" "PATCH"]
-                      :exclude_paths []}}]
+              :rules {}}]
     (each [k v (pairs (or overrides {}))]
       (tset base k v))
     base))

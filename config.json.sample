@@ -18,10 +18,8 @@
       "timeout": 10000,
 
       "rules": {
-        "include_paths": ["*"],
-        "include_tags": [],
-        "include_methods": ["GET", "POST", "PUT", "DELETE", "PATCH"],
-        "exclude_paths": ["/internal/*", "/debug/*"]
+        "paths": ["!/internal/*", "!/debug/*"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"]
       },
 
       "rate_limit": {
@@ -66,10 +64,9 @@
       "host_header": "orders.internal",
 
       "rules": {
-        "include_paths": ["/v2/*"],
-        "include_tags": ["orders"],
-        "include_methods": ["GET", "POST"],
-        "exclude_paths": []
+        "paths": ["/v2/*"],
+        "tags": ["orders"],
+        "methods": ["GET", "POST"]
       },
 
       "keepalive": {
@@ -93,10 +90,7 @@
       "websocket": true,
 
       "rules": {
-        "include_paths": ["*"],
-        "include_tags": [],
-        "include_methods": ["GET", "POST"],
-        "exclude_paths": []
+        "methods": ["GET", "POST"]
       },
 
       "nginx_directives": [

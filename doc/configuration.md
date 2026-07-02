@@ -38,14 +38,43 @@ See [`config.json.sample`](../config.json.sample) for a full annotated example.
 
 ## Rules
 
-Applied as **include_paths ∩ include_methods ∩ include_tags − exclude_paths**. An operation must pass all active filters to appear in the merged schema.
+Controls which operations appear in the merged schema. All fields are optional — omitting `rules` entirely allows everything.
 
-| Rule | Default | Behaviour |
-|------|---------|-----------|
-| `include_paths` | `["*"]` | Path whitelist. `*` = all, `/v1/*` = prefix match |
-| `include_methods` | all | Method whitelist. Empty = all methods |
-| `include_tags` | `[]` | Tag whitelist. Empty = tag filter disabled |
-| `exclude_paths` | `[]` | Blacklist applied after includes |
+| Field | Default | Description |
+|-------|---------|-------------|
+| `paths` | all | Path filter patterns |
+| `methods` | all | Method filter patterns |
+| `tags` | all | Tag filter patterns |
+
+Each field is an array of patterns. Empty or absent means **allow all**. Patterns support `*` as a suffix wildcard (`/v1/*`). Prefix a pattern with `!` to exclude matches — exclusions always win over inclusions.
+
+```json
+"rules": {}
+```
+Allow everything (same as omitting `rules`).
+
+```json
+"rules": {
+  "methods": ["GET", "POST"]
+}
+```
+Only GET and POST operations.
+
+```json
+"rules": {
+  "paths": ["!/internal/*"],
+  "methods": ["!DELETE"]
+}
+```
+All paths except `/internal/*`, all methods except DELETE.
+
+```json
+"rules": {
+  "paths": ["/v1/*", "!/v1/admin/*"],
+  "tags": ["public"]
+}
+```
+Only `/v1/*` paths (excluding `/v1/admin/*`) that carry the `public` tag.
 
 ## Multiple upstreams and load balancing
 

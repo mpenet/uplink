@@ -1,7 +1,6 @@
 (fn wildcard-match? [pattern s]
   (if (= pattern "*")
     true
-    ;; simple prefix wildcard: /foo/* matches /foo/bar/baz
     (let [star-pos (pattern:find "*" 1 true)]
       (if star-pos
         (let [prefix (pattern:sub 1 (- star-pos 1))]
@@ -15,37 +14,44 @@
       (set found true)))
   found)
 
-(fn include-path? [rules path]
-  (let [inc (or rules.include_paths ["*"])]
-    (if (= (# inc) 0)
-      true
-      (matches-any? inc path))))
+;; Split a pattern list into positive includes and negated excludes (!pattern).
+(fn split-patterns [patterns]
+  (let [includes []
+        excludes []]
+    (each [_ p (ipairs patterns)]
+      (if (= (p:sub 1 1) "!")
+        (table.insert excludes (p:sub 2))
+        (table.insert includes p)))
+    (values includes excludes)))
 
-(fn exclude-path? [rules path]
-  (let [exc (or rules.exclude_paths [])]
-    (matches-any? exc path)))
+;; Returns true when s passes a pattern list.
+;; Empty list → allow all. Exclusions always win over inclusions.
+(fn passes? [patterns s]
+  (if (= (# patterns) 0)
+    true
+    (let [(includes excludes) (split-patterns patterns)]
+      (and (not (matches-any? excludes s))
+           (or (= (# includes) 0) (matches-any? includes s))))))
+
+(fn include-path? [rules path]
+  (passes? (or rules.paths []) path))
 
 (fn include-method? [rules method]
-  (let [inc (or rules.include_methods [])]
-    (if (= (# inc) 0)
-      true
-      (matches-any? inc (method:upper)))))
+  (passes? (or rules.methods []) (method:upper)))
 
 (fn include-tag? [rules op-tags]
-  (let [inc (or rules.include_tags [])]
-    (if (= (# inc) 0)
+  (let [tags (or rules.tags [])]
+    (if (= (# tags) 0)
       true
       (do
         (var found false)
         (each [_ t (ipairs (or op-tags [])) &until found]
-          (when (matches-any? inc t)
+          (when (passes? tags t)
             (set found true)))
         found))))
 
-;; Returns true if this operation (path + method + tags) passes the service rules.
 (fn allow? [rules path method op-tags]
   (and (include-path? rules path)
-       (not (exclude-path? rules path))
        (include-method? rules method)
        (include-tag? rules op-tags)))
 

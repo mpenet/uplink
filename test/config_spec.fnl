@@ -25,8 +25,7 @@
       (fn []
         (let [cfg (config.load "config.json")]
           (each [_ svc (ipairs cfg.services)]
-            (assert.is_not_nil svc.rules)
-            (assert.is_not_nil svc.rules.include_paths)))))))
+            (assert.is_not_nil svc.rules)))))))
 
 (describe "store-in-shared / load-from-shared"
   (fn []
