@@ -99,6 +99,8 @@ make generate && make reload
 | `nginx_directives` | no | — | Extra nginx directives in the generated location block (see below) |
 | `host_header` | no | first upstream host | Host header value sent to upstreams (useful with multiple upstreams) |
 | `keepalive` | no | see below | Upstream keepalive pool settings |
+| `balancing` | no | `"round_robin"` | Load balancing algorithm: `"round_robin"`, `"least_conn"`, `"ip_hash"`, `"random"` |
+| `websocket` | no | — | Set `true` to proxy WebSocket upgrades |
 | `cors` | no | — | CORS configuration (see below) |
 | `headers` | no | — | Request/response header injection and stripping (see below) |
 
@@ -173,17 +175,64 @@ Controls the nginx upstream keepalive pool per service. All three fields are opt
 
 Changes require `make generate && make reload`.
 
-### Multiple upstreams
+### Multiple upstreams and load balancing
 
-Pass an array to `upstream` for nginx round-robin load balancing across multiple servers:
+Pass an array to `upstream` for load balancing across multiple servers:
 
 ```json
 "upstream": ["http://users-1:8080", "http://users-2:8080", "http://users-3:8080"]
 ```
 
+Server entries may also be objects to control per-server parameters:
+
+```json
+"upstream": [
+  {"url": "http://users-1:8080", "weight": 3},
+  {"url": "http://users-2:8080", "weight": 1, "max_fails": 3, "fail_timeout": "30s"}
+]
+```
+
+| Field | Description |
+|-------|-------------|
+| `url` | Upstream server URL |
+| `weight` | Relative request weight (default: 1) |
+| `max_fails` | Consecutive failures before server is marked down (nginx passive health) |
+| `fail_timeout` | Duration server is skipped after `max_fails` (e.g. `"30s"`) |
+
+String entries and object entries may be mixed in the same array.
+
+Set `balancing` to select the load-balancing algorithm:
+
+```json
+"balancing": "least_conn"
+```
+
+| Value | Algorithm |
+|-------|-----------|
+| `"round_robin"` | Default. Distribute requests in turn |
+| `"least_conn"` | Route to the server with the fewest active connections |
+| `"ip_hash"` | Consistent hashing by client IP — sticky sessions |
+| `"random"` | Random server selection |
+
 All servers share one keepalive pool. The `Host` header is set to the first upstream's host by default; override with `host_header` if your servers have different hostnames.
 
-nginx's passive failover applies: a server is skipped for the duration of the request on connection error or timeout (`proxy_next_upstream error timeout`).
+Changes require `make generate && make reload`.
+
+### WebSocket
+
+Set `websocket: true` to proxy WebSocket connections:
+
+```json
+{
+  "name": "chat",
+  "upstream": "http://chat-svc:8080",
+  "websocket": true
+}
+```
+
+This emits `Upgrade` and `Connection: upgrade` headers and extends `proxy_read_timeout` to 3600s to keep long-lived connections alive. The full set of forwarding headers (`Host`, `traceparent`, `X-Request-ID`, `X-Forwarded-For`, `X-Forwarded-Proto`) is re-emitted in the location block because nginx does not inherit server-block `proxy_set_header` directives once a location adds any of its own.
+
+Changes require `make generate && make reload`.
 
 ### CORS
 
@@ -269,7 +318,7 @@ Re-reads and validates `config.json`, bumps the config version. Workers pick up 
 - Header injection/stripping (`headers.request.*`, `headers.response.*`)
 
 **Requires `make generate && make reload`**:
-- `upstream`, `tls`, `timeout`, `host_header`, `keepalive` changes
+- `upstream`, `balancing`, `tls`, `timeout`, `host_header`, `keepalive`, `websocket` changes
 - Adding or removing services
 - `nginx_directives` changes
 - `cors` changes

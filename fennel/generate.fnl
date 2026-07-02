@@ -6,14 +6,20 @@
 ;;   luajit generate.lua        (Docker / OpenResty luajit)
 ;;   lua generate.lua           (dev, requires dkjson)
 ;;
-;; upstream accepts a string or array — arrays generate multiple server lines
-;; for nginx round-robin load balancing.
+;; upstream: string, array of strings, or array of {url, weight, max_fails,
+;; fail_timeout} objects — all forms may be mixed in the same array.
+;;
+;; balancing: "round_robin" (default), "least_conn", "ip_hash", "random".
+;;
+;; websocket: true adds Upgrade/Connection headers. Any proxy_set_header in a
+;; location overrides ALL server-block proxy_set_header directives, so the
+;; full header set is re-emitted in WebSocket locations.
 ;;
 ;; CORS: single/wildcard origin → add_header directives; multiple specific
-;; origins → a map{} block in upstreams.conf so nginx matches dynamically.
+;; origins → a map{} block in upstreams.conf for dynamic matching.
 ;;
-;; Regex locations (~ ^/name(/|$)) enforce slash boundary so /users does not
-;; match /userssettings. Longer names emitted first so /users-v2 wins over /users.
+;; Regex locations (~ ^/name(/|$)) enforce slash boundary. Longer names
+;; emitted first so /users-v2 wins over /users.
 
 (local json
   (let [(ok m) (pcall require :cjson)]
@@ -29,21 +35,26 @@
   (assert (name:match "^[a-zA-Z0-9_-]+$")
           (.. "invalid service name: '" name "' — only [a-zA-Z0-9_-] allowed")))
 
-;; Normalise upstream field — string or array — to an array of URL strings.
-(fn upstream-urls [svc]
-  (if (= (type svc.upstream) :string) [svc.upstream] svc.upstream))
+;; Normalise upstream field to array of entry objects {url, ?weight, ...}.
+(fn upstream-entries [svc]
+  (let [raw (if (= (type svc.upstream) :string) [svc.upstream] svc.upstream)]
+    (icollect [_ u (ipairs raw)]
+      (if (= (type u) :string) {:url u} u))))
 
 (fn upstream-addr [url]
   (or (url:match "^https?://([^/]+)") url))
 
+(fn first-upstream-url [svc]
+  (. (upstream-entries svc) 1 :url))
+
 (fn use-https? [svc]
-  (let [first (. (upstream-urls svc) 1)]
+  (let [first (first-upstream-url svc)]
     (or (not= nil (first:match "^https://"))
         (and svc.tls (or svc.tls.cert svc.tls.key)))))
 
-;; Host header sent to upstream. Explicit field wins; falls back to first URL host.
+;; Host header sent upstream. Explicit field wins; falls back to first URL host.
 (fn service-host-hdr [svc]
-  (or svc.host_header (upstream-addr (. (upstream-urls svc) 1))))
+  (or svc.host_header (upstream-addr (first-upstream-url svc))))
 
 ;; Nginx variable name for per-service CORS origin map (- replaced with _).
 (fn cors-var [svc-name]
@@ -55,17 +66,26 @@
   (let [ka (or svc.keepalive {})
         pool-size (or ka.pool_size 32)
         requests (or ka.requests 1000)
-        timeout (or ka.timeout "60s")]
+        timeout (or ka.timeout "60s")
+        entries (upstream-entries svc)]
     (table.insert buf (.. "upstream " svc.name "_upstream {\n"))
-    (each [_ url (ipairs (upstream-urls svc))]
-      (table.insert buf (.. "    server " (upstream-addr url) ";\n")))
+    (when (and svc.balancing (not= svc.balancing "round_robin"))
+      (table.insert buf (.. "    " svc.balancing ";\n")))
+    (each [_ entry (ipairs entries)]
+      (var params "")
+      (when entry.weight
+        (set params (.. params " weight=" (tostring entry.weight))))
+      (when entry.max_fails
+        (set params (.. params " max_fails=" (tostring entry.max_fails))))
+      (when entry.fail_timeout
+        (set params (.. params " fail_timeout=" (tostring entry.fail_timeout))))
+      (table.insert buf (.. "    server " (upstream-addr entry.url) params ";\n")))
     (table.insert buf (.. "    keepalive " (tostring pool-size) ";\n"))
     (table.insert buf (.. "    keepalive_requests " (tostring requests) ";\n"))
     (table.insert buf (.. "    keepalive_timeout " (tostring timeout) ";\n"))
     (table.insert buf "}\n\n")))
 
-;; CORS map block (http context) — only emitted when service has multiple
-;; specific origins. Single/wildcard origins need no map.
+;; CORS map block (http context) — only when service has multiple specific origins.
 (fn emit-cors-map [svc buf]
   (let [cors svc.cors]
     (when cors
@@ -79,14 +99,22 @@
 
 ;; ── Location block ────────────────────────────────────────────────────────────
 
+;; Re-emit all server-block proxy_set_header directives. Required when a
+;; location adds any proxy_set_header of its own — nginx inherits nothing from
+;; the server block once the location has at least one proxy_set_header.
+(fn emit-proxy-headers [buf]
+  (table.insert buf "    proxy_set_header Host              $upstream_host_header;\n")
+  (table.insert buf "    proxy_set_header traceparent       $traceparent;\n")
+  (table.insert buf "    proxy_set_header X-Request-ID      $request_id;\n")
+  (table.insert buf "    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;\n")
+  (table.insert buf "    proxy_set_header X-Forwarded-Proto $scheme;\n"))
+
 (fn emit-cors-directives [svc buf]
   (let [cors svc.cors
         origins (or cors.origins ["*"])
         methods (table.concat (or cors.methods ["GET" "POST" "OPTIONS"]) ", ")
         headers (table.concat (or cors.headers ["Authorization" "Content-Type"]) ", ")
         max-age (tostring (or cors.max_age 3600))
-        ;; Single wildcard → literal *; single specific → literal origin;
-        ;; multiple specific → nginx map variable (set by emit-cors-map).
         origin-val (if (= (. origins 1) "*")
                      "'*'"
                      (if (= (# origins) 1)
@@ -120,6 +148,14 @@
     (table.insert buf (.. "    proxy_connect_timeout     " timeout-s "s;\n"))
     (table.insert buf (.. "    proxy_read_timeout        " timeout-s "s;\n"))
     (table.insert buf (.. "    proxy_send_timeout        " timeout-s "s;\n"))
+    (when svc.websocket
+      ;; WebSocket: upgrade connection. Re-emit all proxy headers because any
+      ;; proxy_set_header in a location blocks server-block inheritance entirely.
+      ;; Override proxy_read_timeout to keep long-lived WS connections alive.
+      (table.insert buf "    proxy_read_timeout        3600s;\n")
+      (table.insert buf "    proxy_set_header Upgrade    $http_upgrade;\n")
+      (table.insert buf "    proxy_set_header Connection \"upgrade\";\n")
+      (emit-proxy-headers buf))
     (when svc.cors
       (emit-cors-directives svc buf))
     (when svc.nginx_directives
