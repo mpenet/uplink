@@ -279,3 +279,29 @@ make check      # syntax-check all .fnl files
 make test       # compile + run busted test suite
 make clean      # remove compiled files, generated nginx conf, logs
 ```
+
+## Troubleshooting
+
+**`module 'X' not found` at startup**
+Compiled Lua modules are missing. Run `make` to compile `fennel/` → `lib/`, then restart.
+
+**`open() "...nginx/upstreams.conf" failed`**
+`generate.lua` has not run yet. The entrypoint runs it automatically; if running nginx directly, run `make generate` first.
+
+**`no resolver defined to resolve "hostname"`**
+The container's DNS is not reachable. The entrypoint reads `/etc/resolv.conf` and writes `nginx/resolver.conf` automatically. If running outside Docker, ensure `/etc/resolv.conf` has a valid nameserver entry.
+
+**`SSL handshake failed: wrong version number`**
+Upstream is HTTPS but the upstream block is connecting on port 80. Check that the `upstream` URL uses `https://` — Uplink appends `:443` automatically when the port is omitted.
+
+**`SSL handshake failed: alert handshake failure`**
+Upstream requires SNI (common with CDN-backed services). Uplink emits `proxy_ssl_server_name on` automatically for all HTTPS upstreams so this should not occur with a correctly configured `upstream` URL. Verify the upstream host resolves correctly.
+
+**`schema fetch returned HTTP 404`**
+The `schema_url` for a service is wrong. Check the URL returns a valid OpenAPI 3.x JSON or YAML document.
+
+**`/openapi.json` returns `500`**
+Check stderr (error log) for the underlying Lua error. Common causes: shared dict not defined in `nginx.conf`, missing required module, or a schema fetch error on all services simultaneously.
+
+**Circuit breaker stuck open**
+Restart the pod/container — circuit breaker state lives in `uplink_circuit` shared dict which is per-process. Alternatively, lower `open_ttl` in `config.json` and restart to let it recover faster.

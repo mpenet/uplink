@@ -2,18 +2,19 @@
 
 `config.json` at the project root. Override path with `UPLINK_CONFIG` env var.
 
-See [`config.json.sample`](../config.json.sample) for a full annotated example.
+All configuration changes take effect on restart. See [`config.json.sample`](../config.json.sample) for a full annotated example.
 
 ## Top-level structure
 
 ```json
 {
   "server": { ... },
+  "otel":   { ... },
   "services": [ ... ]
 }
 ```
 
-`server` is optional. `services` is required.
+`services` is required. `server` and `otel` are optional.
 
 ## Service fields
 
@@ -35,6 +36,7 @@ See [`config.json.sample`](../config.json.sample) for a full annotated example.
 | `websocket` | no | — | Set `true` to proxy WebSocket upgrades |
 | `cors` | no | — | CORS configuration |
 | `headers` | no | — | Request/response header injection and stripping |
+| `otel` | no | — | OpenTelemetry export config (see [Observability](observability.md)) |
 
 ## Rules
 
@@ -107,7 +109,6 @@ String and object entries may be mixed. `balancing` selects the algorithm:
 | `"ip_hash"` | Consistent hashing by client IP — sticky sessions |
 | `"random"` | Random selection |
 
-Requires restart.
 
 ## WebSocket
 
@@ -117,7 +118,6 @@ Requires restart.
 
 Emits `Upgrade` and `Connection: upgrade` headers and extends `proxy_read_timeout` to 3600s. The full forwarding header set is re-emitted in the location block (nginx does not inherit server-block `proxy_set_header` once a location adds any of its own).
 
-Requires restart.
 
 ## Upstream mTLS
 
@@ -159,8 +159,7 @@ Configure inbound TLS with a top-level `server.tls` block:
 | `verify_client` | no | `"on"` when `client_ca` set | nginx `ssl_verify_client`: `"on"`, `"optional"`, `"off"` |
 | `port` | no | `8443` | HTTPS listen port. Plain HTTP on `8080` is always active |
 
-TLS 1.2/1.3 only, modern cipher suite. Requires restart.
-
+TLS 1.2/1.3 only, modern cipher suite. 
 ## Rate limiting
 
 Leaky bucket via `resty.limit.req`. Requests within `burst` are admitted immediately; excess return `429`.
@@ -172,7 +171,6 @@ Leaky bucket via `resty.limit.req`. Requests within `burst` are admitted immedia
 }
 ```
 
-Takes effect after restart.
 
 ## Circuit breaker
 
@@ -185,8 +183,7 @@ After `threshold` consecutive 5xx responses the circuit opens; requests get `503
 }
 ```
 
-State is shared across all workers. Takes effect after restart.
-
+State is shared across all workers. 
 ## Keepalive pool
 
 ```json
@@ -203,7 +200,6 @@ State is shared across all workers. Takes effect after restart.
 | `requests` | `1000` | `keepalive_requests N` — max requests per connection |
 | `timeout` | `"60s"` | `keepalive_timeout T` — idle connection lifetime |
 
-Requires restart.
 
 ## CORS
 
@@ -225,8 +221,7 @@ Requires restart.
 | `max_age` | `3600` | `Access-Control-Max-Age` in seconds |
 | `credentials` | `false` | Emit `Access-Control-Allow-Credentials: true` (incompatible with `origins: ["*"]`) |
 
-OPTIONS preflight is short-circuited with `204`. Requires restart.
-
+OPTIONS preflight is short-circuited with `204`. 
 ## Header injection and stripping
 
 ```json
@@ -242,8 +237,7 @@ OPTIONS preflight is short-circuited with `204`. Requires restart.
 }
 ```
 
-`request.*` runs in the access phase before forwarding. `response.*` runs in the header filter phase before returning to the client. Takes effect after restart.
-
+`request.*` runs in the access phase before forwarding. `response.*` runs in the header filter phase before returning to the client. 
 ## Extra nginx directives
 
 ```json
@@ -253,4 +247,4 @@ OPTIONS preflight is short-circuited with `204`. Requires restart.
 ]
 ```
 
-Emitted verbatim after timeout directives and before Lua phase blocks. Use an array so repeatable directives like `add_header` work correctly. Syntax errors are caught by `nginx -t`. Requires restart.
+Emitted verbatim after timeout directives and before Lua phase blocks. Use an array so repeatable directives like `add_header` work correctly. Syntax errors are caught by `nginx -t`. 

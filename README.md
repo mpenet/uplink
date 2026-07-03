@@ -6,6 +6,8 @@ OpenResty based API gateway that aggregates multiple upstream OpenAPI 3.x servic
 
 Proxying runs entirely through native nginx `proxy_pass` — keepalive pools, TLS, body streaming, and retries happen at C speed with no Lua on the hot path. Lua runs only in the access phase (rate limiting, circuit breaker, traceparent injection) and the log phase (metrics, OTel spans).
 
+**Features:** multi-upstream load balancing · per-service rate limiting · half-open circuit breaker · W3C trace propagation · OpenTelemetry OTLP/HTTP · Prometheus metrics · JSON access log · server TLS/mTLS · WebSocket · CORS · header injection/stripping
+
 ## How it works
 
 `config.json` describes your upstream services. At startup, Uplink generates nginx upstream and location blocks from it, then proxies requests under each service's `/<name>` prefix.
