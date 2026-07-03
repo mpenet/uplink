@@ -36,6 +36,7 @@ All configuration changes take effect on restart. See [`config.json.sample`](../
 | `websocket` | no | — | Set `true` to proxy WebSocket upgrades |
 | `cors` | no | — | CORS configuration |
 | `headers` | no | — | Request/response header injection and stripping |
+| `adaptive_concurrency` | no | — | Gradient-based adaptive concurrency limiting |
 | `otel` | no | — | OpenTelemetry export config (see [Observability](observability.md)) |
 
 ## Rules
@@ -238,6 +239,39 @@ OPTIONS preflight is short-circuited with `204`.
 ```
 
 `request.*` runs in the access phase before forwarding. `response.*` runs in the header filter phase before returning to the client. 
+## Adaptive concurrency
+
+Dynamically adjusts the in-flight request limit using a gradient algorithm. When upstream latency rises above the observed minimum, the limit shrinks; when latency is stable it probes upward. On upstream error it backs off by 10%. Requests that exceed the current limit get `429`.
+
+```json
+"adaptive_concurrency": {
+  "initial_limit": 20,
+  "min_limit": 5,
+  "max_limit": 200,
+  "min_rtt_reset": 60
+}
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `initial_limit` | `20` | Starting concurrency limit before observations accumulate |
+| `min_limit` | `5` | Floor — limit never drops below this |
+| `max_limit` | `200` | Ceiling — limit never rises above this |
+| `min_rtt_reset` | `60` | Seconds before the minimum-RTT baseline is re-sampled. Allows the limit to grow after upstream latency genuinely improves |
+
+The gradient update runs per-request in the log phase:
+
+```
+new_limit = floor(current_limit × (min_rtt / rtt_ema) + sqrt(current_limit))   # success
+new_limit = floor(current_limit × 0.9)                                           # 5xx
+```
+
+Where `rtt_ema` is an exponential moving average (α = 0.1) of upstream response time and `min_rtt` is the minimum observed RTT since the last reset.
+
+`adaptive_concurrency` and `rate_limit` can coexist — the rate limiter is checked first.
+
+State lives in `uplink_adaptive` shared dict. Requires the dict to be declared in `nginx.conf` (enabled by default).
+
 ## Extra nginx directives
 
 ```json

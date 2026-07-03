@@ -20,6 +20,7 @@
 (local config-mod (require :config))
 (local circuit (require :circuit))
 (local ratelimit (require :ratelimit))
+(local adaptive (require :adaptive))
 (local metrics (require :metrics))
 (local otel (require :otel))
 
@@ -62,6 +63,14 @@
       (set ngx.var.upstream_path (if (= stripped "") "/" stripped)))
     ;; Traceparent: propagate existing trace or start new one.
     (set ngx.var.traceparent (make-traceparent (ngx.req.get_headers)))
+    ;; Adaptive concurrency — 429 if inflight exceeds dynamic limit.
+    (when service.adaptive_concurrency
+      (if (= false (adaptive.allow? service))
+        (do
+          (set ngx.status 429)
+          (ngx.say "{\"error\":\"concurrency limit exceeded\"}")
+          (ngx.exit 429))
+        (tset ngx.ctx :adaptive_admitted true)))
     ;; Rate limit — 429 if exceeded.
     (let [(ok _) (ratelimit.check service)]
       (when (= ok false)
@@ -113,6 +122,8 @@
         (when (>= ngx.status 500)
           (metrics.proxy-error svc-name ngx.status))
         (when otel-enabled
-          (otel.push! svc-name))))))
+          (otel.push! svc-name))
+        (when (and service.adaptive_concurrency ngx.ctx.adaptive_admitted)
+          (adaptive.on-complete! service duration (< ngx.status 500)))))))
 
 {:access access :on_response on-response :log log}
