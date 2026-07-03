@@ -9,16 +9,7 @@
 (var agg-body nil)
 (var agg-degraded [])
 
-;; Per-worker config cache. Rebuilt only when config version changes.
-(var cfg-ver -1)
-(var local-cfg nil)
-
-(fn get-cfg []
-  (let [ver (config-mod.get-version)]
-    (when (not= ver cfg-ver)
-      (set local-cfg (config-mod.load-from-shared))
-      (set cfg-ver ver))
-    local-cfg))
+(fn get-cfg [] (config-mod.get))
 
 (fn merge-components [acc components]
   (each [section items (pairs components)]

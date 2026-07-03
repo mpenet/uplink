@@ -27,40 +27,15 @@
           (each [_ svc (ipairs cfg.services)]
             (assert.is_not_nil svc.rules)))))))
 
-(describe "store-in-shared / load-from-shared"
+(describe "config.get"
   (fn []
-    (it "round-trips config through shared dict"
+    (it "returns nil before load"
       (fn []
-        (let [cfg (config.load "config.json")
-              _ (config.store-in-shared cfg)
-              loaded (config.load-from-shared)]
-          (assert.equals (# cfg.services) (# loaded.services))
-          (assert.equals (. cfg.services 1 :name) (. loaded.services 1 :name)))))
+        (assert.is_nil (config.get))))
 
-    (it "increments version on each store"
+    (it "returns cfg after load"
       (fn []
-        (let [cfg (config.load "config.json")
-              v1 (config.store-in-shared cfg)
-              v2 (config.store-in-shared cfg)]
-          (assert.equals (+ v1 1) v2))))))
-
-(describe "get-version"
-  (fn []
-    (it "returns 0 before any store"
-      (fn []
-        (assert.equals 0 (config.get-version))))
-
-    (it "returns current version after store"
-      (fn []
-        (let [cfg (config.load "config.json")
-              ver (config.store-in-shared cfg)]
-          (assert.equals ver (config.get-version)))))))
-
-(describe "config.reload"
-  (fn []
-    (it "returns cfg and version"
-      (fn []
-        (let [r (config.reload "config.json")]
-          (assert.is_not_nil r.cfg)
-          (assert.is_not_nil r.version)
-          (assert.is_truthy (>= r.version 1)))))))
+        (config.load "config.json")
+        (let [cfg (config.get)]
+          (assert.is_not_nil cfg.services)
+          (assert.equals cfg (config.get)))))))

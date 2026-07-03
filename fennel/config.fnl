@@ -1,5 +1,7 @@
 (local json (require :cjson))
 
+(var _cfg nil)
+
 (fn load-file [path]
   (let [f (assert (io.open path :r))
         raw (f:read :*a)]
@@ -23,44 +25,9 @@
   cfg)
 
 (fn load [path]
-  (validate (load-file path)))
+  (set _cfg (validate (load-file path)))
+  _cfg)
 
-;; -- Shared-dict persistence for hot-reload --
+(fn get [] _cfg)
 
-(fn get-shared-dict []
-  (let [d (. ngx.shared :uplink_config)]
-    (assert d "lua_shared_dict 'uplink_config' not defined in nginx.conf")
-    d))
-
-(fn store-in-shared [cfg]
-  (let [d (get-shared-dict)]
-    ;; Write config first, then atomically bump version.
-    ;; Workers use version as the reload signal — they see new config only after bump.
-    (d:set :config (json.encode cfg) 0)
-    (let [(ver err) (d:incr :version 1 0)]
-      (when (not ver)
-        (error (.. "failed to bump config version: " (or err "unknown"))))
-      ver)))
-
-(fn load-from-shared []
-  (let [d (get-shared-dict)
-        raw (d:get :config)]
-    (assert raw "no config stored in shared dict — was init_by_lua_block run?")
-    (json.decode raw)))
-
-(fn get-version []
-  (let [d (. ngx.shared :uplink_config)]
-    (or (and d (d:get :version)) 0)))
-
-;; Reload from file, validate, store in shared dict.
-;; Returns {:cfg :version}.
-(fn reload [path]
-  (let [cfg (load path)
-        ver (store-in-shared cfg)]
-    {:cfg cfg :version ver}))
-
-{:load load
- :store-in-shared store-in-shared
- :load-from-shared load-from-shared
- :get-version get-version
- :reload reload}
+{:load load :get get}

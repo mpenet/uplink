@@ -22,31 +22,6 @@ Each service's OpenAPI schema is fetched from `schema_url`, filtered by `rules`,
 - **Background refresh** — each service has a timer firing at 90% of its TTL. On failure, the last good schema is served and a warning is logged.
 - **Degraded mode** — if a service has no usable schema (cold miss + fetch failure), it is excluded from the merged doc and listed in `X-Uplink-Degraded`.
 
-## Hot reload
-
-```sh
-curl -X POST http://127.0.0.1:8080/reload
-# {"ok":true,"version":2}
-```
-
-Re-reads and validates `config.json`, bumps the config version. Workers pick up changes lazily on their next request.
-
-**Takes effect immediately:**
-- Schema filter rules
-- Rate limit parameters
-- Circuit breaker parameters
-- Schema TTL
-- Header injection/stripping
-
-**Requires `make generate && make reload`:**
-- `upstream`, `balancing`, `tls`, `timeout`, `host_header`, `keepalive`, `websocket` changes
-- `server.tls` changes
-- Adding or removing services
-- `nginx_directives` changes
-- `cors` changes
-
-The `/reload` endpoint is restricted to loopback (`127.0.0.1` / `::1`).
-
 ## Endpoints
 
 | Endpoint | Description |
@@ -54,7 +29,6 @@ The `/reload` endpoint is restricted to loopback (`127.0.0.1` / `::1`).
 | `GET /openapi.json` | Merged OpenAPI 3.x schema for all services |
 | `GET /healthz` | Returns `{"status":"ok"}` |
 | `GET /metrics` | Prometheus-format metrics |
-| `POST /reload` | Hot-reload `config.json` (loopback only) |
 | `* /{name}/...` | Proxy to the named service |
 
 `X-Uplink-Degraded: svc1,svc2` is set on `/openapi.json` responses when one or more services have no usable schema.

@@ -32,11 +32,6 @@ docker run -p 8080:8080 -v ./config.json:/uplink/config.json uplink
 
 Copy [`config.json.sample`](config.json.sample) to `config.json`, point it at your upstreams, and you're done.
 
-```sh
-# Hot-reload rules, rate limits, circuit breaker thresholds — no restart needed
-curl -X POST http://127.0.0.1:8080/reload
-```
-
 ## Documentation
 
 - [**Configuration**](doc/configuration.md) — service fields, rules, TLS, rate limiting, circuit breaker, load balancing, WebSocket, CORS, headers, nginx directives

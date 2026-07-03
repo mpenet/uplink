@@ -27,27 +27,14 @@
 ;; nginx.conf this is nil and the log phase skips otel at zero cost.
 (local otel-enabled (not= nil (. ngx.shared :uplink_otel)))
 
-;; Per-worker service lookup table, rebuilt only when config version changes.
-(var services-by-name {})
-(var services-version 0)
-(var last-ver-check 0)
-
-(fn get-services []
-  (let [now (ngx.now)]
-    (when (>= (- now last-ver-check) 0.1)
-      (set last-ver-check now)
-      (let [ver (config-mod.get-version)]
-        (when (not= ver services-version)
-          (let [cfg (config-mod.load-from-shared)
-                by-name {}]
-            (each [_ svc (ipairs cfg.services)]
-              (tset by-name svc.name svc))
-            (set services-by-name by-name)
-            (set services-version ver))))))
-  services-by-name)
+(local services-by-name
+  (let [by-name {}]
+    (each [_ svc (ipairs (config-mod.get).services)]
+      (tset by-name svc.name svc))
+    by-name))
 
 (fn get-service [name]
-  (. (get-services) name))
+  (. services-by-name name))
 
 ;; ── W3C traceparent ───────────────────────────────────────────────────────────
 

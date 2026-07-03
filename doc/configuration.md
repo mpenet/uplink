@@ -107,7 +107,7 @@ String and object entries may be mixed. `balancing` selects the algorithm:
 | `"ip_hash"` | Consistent hashing by client IP — sticky sessions |
 | `"random"` | Random selection |
 
-Requires `make generate && make reload`.
+Requires restart.
 
 ## WebSocket
 
@@ -117,7 +117,7 @@ Requires `make generate && make reload`.
 
 Emits `Upgrade` and `Connection: upgrade` headers and extends `proxy_read_timeout` to 3600s. The full forwarding header set is re-emitted in the location block (nginx does not inherit server-block `proxy_set_header` once a location adds any of its own).
 
-Requires `make generate && make reload`.
+Requires restart.
 
 ## Upstream mTLS
 
@@ -159,7 +159,7 @@ Configure inbound TLS with a top-level `server.tls` block:
 | `verify_client` | no | `"on"` when `client_ca` set | nginx `ssl_verify_client`: `"on"`, `"optional"`, `"off"` |
 | `port` | no | `8443` | HTTPS listen port. Plain HTTP on `8080` is always active |
 
-TLS 1.2/1.3 only, modern cipher suite. Requires `make generate && make reload`.
+TLS 1.2/1.3 only, modern cipher suite. Requires restart.
 
 ## Rate limiting
 
@@ -172,7 +172,7 @@ Leaky bucket via `resty.limit.req`. Requests within `burst` are admitted immedia
 }
 ```
 
-Takes effect immediately after `/reload`.
+Takes effect after restart.
 
 ## Circuit breaker
 
@@ -185,7 +185,7 @@ After `threshold` consecutive 5xx responses the circuit opens; requests get `503
 }
 ```
 
-State is shared across all workers. Takes effect immediately after `/reload`.
+State is shared across all workers. Takes effect after restart.
 
 ## Keepalive pool
 
@@ -203,7 +203,7 @@ State is shared across all workers. Takes effect immediately after `/reload`.
 | `requests` | `1000` | `keepalive_requests N` — max requests per connection |
 | `timeout` | `"60s"` | `keepalive_timeout T` — idle connection lifetime |
 
-Requires `make generate && make reload`.
+Requires restart.
 
 ## CORS
 
@@ -225,7 +225,7 @@ Requires `make generate && make reload`.
 | `max_age` | `3600` | `Access-Control-Max-Age` in seconds |
 | `credentials` | `false` | Emit `Access-Control-Allow-Credentials: true` (incompatible with `origins: ["*"]`) |
 
-OPTIONS preflight is short-circuited with `204`. Requires `make generate && make reload`.
+OPTIONS preflight is short-circuited with `204`. Requires restart.
 
 ## Header injection and stripping
 
@@ -242,7 +242,7 @@ OPTIONS preflight is short-circuited with `204`. Requires `make generate && make
 }
 ```
 
-`request.*` runs in the access phase before forwarding. `response.*` runs in the header filter phase before returning to the client. Takes effect immediately after `/reload`.
+`request.*` runs in the access phase before forwarding. `response.*` runs in the header filter phase before returning to the client. Takes effect after restart.
 
 ## Extra nginx directives
 
@@ -253,4 +253,4 @@ OPTIONS preflight is short-circuited with `204`. Requires `make generate && make
 ]
 ```
 
-Emitted verbatim after timeout directives and before Lua phase blocks. Use an array so repeatable directives like `add_header` work correctly. Syntax errors are caught by `nginx -t`. Requires `make generate && make reload`.
+Emitted verbatim after timeout directives and before Lua phase blocks. Use an array so repeatable directives like `add_header` work correctly. Syntax errors are caught by `nginx -t`. Requires restart.

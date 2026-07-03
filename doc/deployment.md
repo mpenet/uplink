@@ -75,14 +75,6 @@ docker run -p 8080:8080 -p 8443:8443 \
 
 `server.tls` in `config.json` must reference absolute paths inside the container (e.g. `/certs/server.crt`).
 
-### Hot reload
-
-```sh
-docker exec <container> curl -s -X POST http://127.0.0.1:8080/reload
-```
-
-This re-reads `config.json` and applies rate limits, circuit breaker thresholds, schema rules, and header config without restarting nginx. For upstream or TLS changes, rebuild the image or re-run the container (the entrypoint re-generates nginx config on every start).
-
 ### Custom nginx.conf
 
 To override shared dict sizes or other nginx settings:
@@ -116,6 +108,8 @@ services:
 
 ## Kubernetes
 
+### Basic deployment
+
 ```sh
 kubectl create configmap uplink-config --from-file=config.json
 ```
@@ -130,6 +124,10 @@ spec:
   selector:
     matchLabels:
       app: uplink
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   template:
     metadata:
       labels:
@@ -137,18 +135,32 @@ spec:
     spec:
       containers:
         - name: uplink
-          image: uplink:latest
+          image: ghcr.io/mpenet/uplink:latest
           ports:
             - containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 1000m
+              memory: 256Mi
           volumeMounts:
             - name: config
               mountPath: /uplink/config.json
               subPath: config.json
           livenessProbe:
-            httpGet: { path: /healthz, port: 8080 }
+            httpGet:
+              path: /healthz
+              port: 8080
             initialDelaySeconds: 5
+            periodSeconds: 10
           readinessProbe:
-            httpGet: { path: /healthz, port: 8080 }
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
       volumes:
         - name: config
           configMap:
@@ -164,9 +176,84 @@ spec:
   ports:
     - port: 80
       targetPort: 8080
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: uplink
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: uplink
 ```
 
-To update rules/rate limits/circuit breaker thresholds without restarting: update the ConfigMap, then exec `/reload` into each pod. For upstream or TLS changes, roll the deployment.
+### DNS resolver
+
+The entrypoint auto-reads the nameserver from `/etc/resolv.conf` at startup, which works correctly in K8s clusters (typically resolves to `kube-dns` or `CoreDNS`). No manual resolver configuration needed.
+
+### Config updates
+
+Config is loaded once at startup. To apply `config.json` changes, update the ConfigMap and roll the Deployment:
+
+```sh
+kubectl create configmap uplink-config --from-file=config.json -o yaml --dry-run=client | kubectl apply -f -
+kubectl rollout restart deployment/uplink
+```
+
+With `maxUnavailable: 0` this is zero-downtime. Use [stakater/Reloader](https://github.com/stakater/Reloader) to automate rollouts whenever the ConfigMap changes.
+
+### TLS with cert-manager
+
+For server TLS, provision a certificate with [cert-manager](https://cert-manager.io) and mount the Secret:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: uplink-tls
+spec:
+  secretName: uplink-tls
+  dnsNames:
+    - api.example.com
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+```
+
+Mount the Secret into the pod:
+```yaml
+volumeMounts:
+  - name: tls
+    mountPath: /certs
+    readOnly: true
+volumes:
+  - name: tls
+    secret:
+      secretName: uplink-tls
+```
+
+Reference in `config.json`:
+```json
+"server": {
+  "tls": {
+    "cert": "/certs/tls.crt",
+    "key":  "/certs/tls.key"
+  }
+}
+```
+
+cert-manager writes renewed certificates to the Secret and K8s updates the mounted files in place. To pick up the new cert, roll the Deployment — with `maxUnavailable: 0` this is zero-downtime. Automate this with [stakater/Reloader](https://github.com/stakater/Reloader), which watches Secrets and triggers a rolling restart when they change.
+
+### Horizontal scaling
+
+Uplink is stateless at the routing and proxying level and scales horizontally. Note that shared dict state — circuit breaker counters, rate limiter buckets, schema cache — is **per pod**. In a multi-replica deployment:
+
+- **Rate limits** are enforced per pod, not globally. A `requests_per_second: 100` limit with 3 replicas effectively allows ~300 rps cluster-wide.
+- **Circuit breakers** open independently per pod. A flapping upstream may trip the breaker on one pod while others continue proxying.
+- **Schema cache** is populated independently per pod on first request after startup.
+
+For global rate limiting, place a shared rate limiter (e.g. Redis + nginx-lua-resty-limit) in front of Uplink or at the Ingress layer.
 
 ## Shared dict sizing
 
@@ -187,7 +274,6 @@ Override by mounting a custom `nginx/nginx.conf`. See [`nginx/nginx.conf.sample`
 make            # compile fennel/ → lib/*.lua and generate.lua
 make generate   # run generate.lua → nginx/upstreams.conf + nginx/locations.conf + nginx/listen.conf
 make run        # compile + generate + start OpenResty
-make reload     # send nginx reload signal
 make stop       # stop OpenResty
 make check      # syntax-check all .fnl files
 make test       # compile + run busted test suite
