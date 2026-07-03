@@ -1,4 +1,6 @@
-# Uplink
+<img width="200" height="200" src="https://github.com/user-attachments/assets/b9419850-2195-4138-9938-ba2347daece3" />
+
+<br>
 
 OpenResty based API gateway that aggregates multiple upstream OpenAPI 3.x services under a single endpoint. Each service is exposed under a `/<name>` prefix; a merged `/openapi.json` covers all of them.
 
