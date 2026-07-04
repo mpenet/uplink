@@ -110,13 +110,15 @@
       ;; Kid not found — keys may have rotated; invalidate and retry once.
       (do
         (tset jwks-cache url nil)
-        (let [fresh (get-jwks-pems url)]
-          (or (. fresh k)
-              ;; Fall back to first available key (no-kid tokens with single key JWKS).
-              (let [first nil]
-                (each [_ v (pairs fresh)]
-                  (when (not first) (set first v)))
-                (or first (error (.. "no usable key in JWKS " url))))))))))
+        (let [fresh (get-jwks-pems url)
+              found (. fresh k)]
+          (if found
+            found
+            (do
+              (var first-pem nil)
+              (each [_ v (pairs fresh)]
+                (when (not first-pem) (set first-pem v)))
+              (or first-pem (error (.. "no usable key in JWKS " url))))))))))
 
 ;; ── Claim validation ──────────────────────────────────────────────────────────
 
@@ -125,13 +127,13 @@
     (let [actual (. payload k)]
       (if (= k "aud")
         ;; aud may be string or array per RFC 7519 §4.1.3
-        (let [match (if (= (type actual) "string")
-                      (= actual v)
-                      (do (var found false)
-                          (each [_ a (ipairs (or actual []))]
-                            (when (= a v) (set found true)))
-                          found))]
-          (when (not match)
+        (let [aud-ok (if (= (type actual) "string")
+                       (= actual v)
+                       (do (var found false)
+                           (each [_ a (ipairs (or actual []))]
+                             (when (= a v) (set found true)))
+                           found))]
+          (when (not aud-ok)
             (error (.. "claim aud mismatch: expected " v))))
         (when (not= actual v)
           (error (.. "claim " k " mismatch")))))))
