@@ -36,10 +36,19 @@ Copy [`config.json.sample`](config.json.sample) to `config.json`, point it at yo
 
 ## Documentation
 
-- [**Configuration**](doc/configuration.md) — service fields, rules, TLS, JWT auth, rate limiting, adaptive concurrency, load balancing, WebSocket, CORS, headers, nginx directives
-- [**Features**](doc/features.md) — routing, schema aggregation, authentication, endpoints
-- [**Observability**](doc/observability.md) — Prometheus metrics, JSON access log, OpenTelemetry
-- [**Deployment**](doc/deployment.md) — Docker, Docker Compose, Kubernetes, shared dict sizing
+See the **[documentation index](doc/index.md)** for all pages.
+
+| Page | Description |
+|------|-------------|
+| [How it works](doc/how-it-works.md) | Request lifecycle, routing, schema aggregation, trace propagation |
+| [Configuration](doc/configuration.md) | Config structure and service field reference |
+| [Routing](doc/routing.md) | Rules, load balancing, WebSocket |
+| [Authentication](doc/auth.md) | JWT — HMAC, PEM, JWKS |
+| [TLS](doc/tls.md) | Server TLS/mTLS, upstream mTLS |
+| [Traffic control](doc/traffic.md) | Rate limiting, adaptive concurrency, keepalive pools |
+| [Headers & CORS](doc/headers.md) | Header injection/stripping, CORS |
+| [Observability](doc/observability.md) | Prometheus metrics, JSON access log, OpenTelemetry |
+| [Deployment](doc/deployment.md) | Docker, Kubernetes, shared dict sizing, troubleshooting |
 
 ## License
 
