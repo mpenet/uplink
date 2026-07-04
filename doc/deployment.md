@@ -18,7 +18,7 @@ docker build -t uplink .
 
 The Dockerfile uses a two-stage build:
 
-1. **Builder** (`openresty/openresty:alpine-fat`) — installs Fennel and lyaml via LuaRocks, compiles all `fennel/*.fnl` modules to `lib/*.lua`, and compiles `fennel/generate.fnl` to `generate.lua`.
+1. **Builder** (`openresty/openresty:alpine-fat`) — installs Fennel and lyaml via LuaRocks, compiles all `fnl/*.fnl` modules to `lib/*.lua`, and compiles `fnl/generate.fnl` to `generate.lua`.
 2. **Runtime** (`openresty/openresty:alpine`) — copies compiled Lua from the builder, the nginx config, and the entrypoint. No build tools in the final image.
 
 What is baked into the image:
@@ -270,7 +270,7 @@ Override by mounting a custom `nginx/nginx.conf`. See [`nginx/nginx.conf.sample`
 ## Makefile targets
 
 ```sh
-make            # compile fennel/ → lib/*.lua and generate.lua
+make            # compile fnl/ → lib/*.lua and generate.lua
 make generate   # run generate.lua → nginx/upstreams.conf + nginx/locations.conf + nginx/listen.conf
 make run        # compile + generate + start OpenResty
 make stop       # stop OpenResty
@@ -282,7 +282,7 @@ make clean      # remove compiled files, generated nginx conf, logs
 ## Troubleshooting
 
 **`module 'X' not found` at startup**
-Compiled Lua modules are missing. Run `make` to compile `fennel/` → `lib/`, then restart.
+Compiled Lua modules are missing. Run `make` to compile `fnl/` → `lib/`, then restart.
 
 **`open() "...nginx/upstreams.conf" failed`**
 `generate.lua` has not run yet. The entrypoint runs it automatically; if running nginx directly, run `make generate` first.

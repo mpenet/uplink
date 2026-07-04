@@ -12,17 +12,17 @@ RUN luarocks install fennel && luarocks install lyaml && luarocks install dkjson
 ENV PATH="/usr/local/openresty/luajit/bin:${PATH}"
 
 WORKDIR /build
-COPY fennel/ fennel/
+COPY fnl/ fnl/
 
 # Compile Fennel modules → lib/ (generate.fnl is a standalone script, not a module)
 RUN mkdir -p lib && \
-    for f in fennel/*.fnl; do \
+    for f in fnl/*.fnl; do \
         [ "$(basename "$f")" = "generate.fnl" ] && continue; \
         fennel --compile "$f" > "lib/$(basename "${f%.fnl}").lua"; \
     done
 
 # Compile standalone generator → generate.lua
-RUN fennel --compile fennel/generate.fnl > generate.lua
+RUN fennel --compile fnl/generate.fnl > generate.lua
 
 FROM openresty/openresty:alpine
 

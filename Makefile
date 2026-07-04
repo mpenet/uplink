@@ -2,8 +2,8 @@ FENNEL    ?= fennel
 OPENRESTY ?= openresty
 LUA       ?= lua
 
-SRC      := $(filter-out fennel/generate.fnl,$(wildcard fennel/*.fnl))
-OUT      := $(patsubst fennel/%.fnl,lib/%.lua,$(SRC))
+SRC      := $(filter-out fnl/generate.fnl,$(wildcard fnl/*.fnl))
+OUT      := $(patsubst fnl/%.fnl,lib/%.lua,$(SRC))
 TEST_SRC := $(wildcard test/*.fnl)
 TEST_OUT := $(patsubst test/%.fnl,test/%.lua,$(TEST_SRC))
 
@@ -12,12 +12,12 @@ TEST_OUT := $(patsubst test/%.fnl,test/%.lua,$(TEST_SRC))
 all: $(OUT) generate.lua
 
 # Compile all Fennel modules to lib/
-lib/%.lua: fennel/%.fnl
+lib/%.lua: fnl/%.fnl
 	@mkdir -p lib
 	$(FENNEL) --compile $< > $@
 
 # Compile standalone generator
-generate.lua: fennel/generate.fnl
+generate.lua: fnl/generate.fnl
 	$(FENNEL) --compile $< > $@
 
 # Generate nginx include files from config.json
@@ -28,7 +28,7 @@ test/%.lua: test/%.fnl
 	$(FENNEL) --compile $< > $@
 
 check:
-	@for f in fennel/*.fnl; do \
+	@for f in fnl/*.fnl; do \
 	    echo "checking $$f"; \
 	    $(FENNEL) --compile $$f > /dev/null && echo "  ok" || echo "  FAIL"; \
 	done
