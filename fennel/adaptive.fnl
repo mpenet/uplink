@@ -47,7 +47,7 @@
 
 ;; Called in log phase. Always decrements inflight.
 ;; Skips gradient update when rtt-s is 0 (upstream not contacted —
-;; circuit-breaker or rate-limit rejection happened before proxy_pass).
+;; rate-limit or adaptive concurrency rejection happened before proxy_pass).
 (fn on-complete! [service rtt-s success]
   (let [d (get-dict)]
     (when d

@@ -63,6 +63,12 @@
       (set ngx.var.upstream_path (if (= stripped "") "/" stripped)))
     ;; Traceparent: propagate existing trace or start new one.
     (set ngx.var.traceparent (make-traceparent (ngx.req.get_headers)))
+    ;; Rate limit — fast rejection before expensive auth checks.
+    (let [(ok _) (ratelimit.check service)]
+      (when (= ok false)
+        (set ngx.status 429)
+        (ngx.say "{\"error\":\"rate limit exceeded\"}")
+        (ngx.exit 429)))
     ;; JWT auth — 401 if token missing or invalid.
     (when service.auth
       (auth.check service))
@@ -74,12 +80,6 @@
           (ngx.say "{\"error\":\"concurrency limit exceeded\"}")
           (ngx.exit 429))
         (tset ngx.ctx :adaptive_admitted true)))
-    ;; Rate limit — 429 if exceeded.
-    (let [(ok _) (ratelimit.check service)]
-      (when (= ok false)
-        (set ngx.status 429)
-        (ngx.say "{\"error\":\"rate limit exceeded\"}")
-        (ngx.exit 429)))
     ;; Request header manipulation — set/strip before forwarding upstream.
     (let [hdrs (and service.headers service.headers.request)]
       (when hdrs

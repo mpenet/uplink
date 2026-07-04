@@ -78,10 +78,15 @@
 ;; ── Render ───────────────────────────────────────────────────────────────────
 
 (local type-header
-  (.. "# TYPE schema_fetch_total counter\n"
+  (.. "# HELP schema_fetch_total Total schema fetches by service and status\n"
+      "# TYPE schema_fetch_total counter\n"
+      "# HELP schema_cache_result_total Schema cache lookup results by service and result\n"
       "# TYPE schema_cache_result_total counter\n"
+      "# HELP proxy_requests_total Total proxied requests by service\n"
       "# TYPE proxy_requests_total counter\n"
+      "# HELP proxy_errors_total Total upstream 5xx errors by service and code\n"
       "# TYPE proxy_errors_total counter\n"
+      "# HELP proxy_request_duration_seconds Upstream response latency histogram by service\n"
       "# TYPE proxy_request_duration_seconds histogram\n"))
 
 (fn render []

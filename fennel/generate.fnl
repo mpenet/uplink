@@ -135,6 +135,8 @@
     (table.insert buf (.. "    add_header 'Access-Control-Allow-Headers' '" headers "' always;\n"))
     (table.insert buf (.. "    add_header 'Access-Control-Max-Age'       '" max-age "' always;\n"))
     (when cors.credentials
+      (assert (not= (. origins 1) "*")
+              (.. "service '" svc.name "': cors.credentials=true is incompatible with origins=[\"*\"] (CORS spec violation)"))
       (table.insert buf "    add_header 'Access-Control-Allow-Credentials' 'true' always;\n"))
     (table.insert buf     "    if ($request_method = OPTIONS) {\n")
     (table.insert buf     "        return 204;\n")
@@ -188,7 +190,7 @@
     (when stls
       (assert (and stls.cert stls.key)
               "server.tls requires both 'cert' and 'key'")
-      (let [port (tostring (or (and cfg.server cfg.server.port) 8443))
+      (let [port (tostring (or stls.port 8443))
             verify (or stls.verify_client (if stls.client_ca "on" "off"))]
         (table.insert buf (.. "listen " port " ssl;\n"))
         (table.insert buf (.. "ssl_certificate           " stls.cert ";\n"))
