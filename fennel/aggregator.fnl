@@ -7,6 +7,7 @@
 ;; Per-worker merged schema cache. Rebuilt only when schema gen changes.
 (var agg-gen -1)
 (var agg-body nil)
+(var agg-etag nil)
 (var agg-degraded [])
 
 (fn get-cfg [] (config-mod.get))
@@ -119,20 +120,39 @@
              :components deduped}
        :degraded degraded})))
 
-;; Serve aggregated schema, rebuilding only when schema gen or config changes.
-;; Pre-encodes JSON once and caches the string; most requests return directly.
+;; Serve aggregated schema.
+;; On gen change: check shared dict first (another worker may have already built
+;; this gen). If not found, build, encode, store in shared dict for other workers.
+;; Supports ETag / 304 to skip retransmission when schema is unchanged.
 (fn handle []
   (let [gen (cache.get-schema-gen)]
-    (when (or (not agg-body) (not= gen agg-gen))
-      (let [cfg (get-cfg)
-            {:doc doc :degraded degraded} (build cfg)]
-        (set agg-body (json.encode doc))
-        (set agg-degraded degraded)
-        (set agg-gen gen)))
-    (tset ngx.header :content_type "application/json; charset=utf-8")
+    (when (not= gen agg-gen)
+      (let [merged (cache.get-merged)]
+        (if (and merged (= merged.gen gen))
+          (do
+            (set agg-body     merged.body)
+            (set agg-etag     merged.etag)
+            (set agg-degraded merged.degraded)
+            (set agg-gen      gen))
+          (let [cfg (get-cfg)
+                {:doc doc :degraded degraded} (build cfg)
+                body (json.encode doc)
+                etag (ngx.md5 body)]
+            (set agg-body     body)
+            (set agg-etag     etag)
+            (set agg-degraded degraded)
+            (set agg-gen      gen)
+            (cache.set-merged gen body etag degraded)))))
+    (tset ngx.header :etag (.. "\"" agg-etag "\""))
+    (tset ngx.header :cache_control "no-cache")
     (when (> (# agg-degraded) 0)
       (tset ngx.header :x_uplink_degraded (table.concat agg-degraded ",")))
-    (ngx.say agg-body)))
+    (let [inm (. (ngx.req.get_headers) :if_none_match)]
+      (if (and inm (= inm (.. "\"" agg-etag "\"")))
+        (ngx.exit 304)
+        (do
+          (tset ngx.header :content_type "application/json; charset=utf-8")
+          (ngx.say agg-body))))))
 
 {:build build
  :handle handle

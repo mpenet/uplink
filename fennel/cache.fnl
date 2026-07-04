@@ -31,7 +31,11 @@
 (local nul (string.char 0))
 (local val-suffix (.. nul "v"))
 (local gen-suffix (.. nul "g"))
-(local schema-gen-key (.. nul "schema_gen"))
+(local schema-gen-key  (.. nul "schema_gen"))
+(local merged-body-key (.. nul "merged:body"))
+(local merged-etag-key (.. nul "merged:etag"))
+(local merged-gen-key  (.. nul "merged:gen"))
+(local merged-deg-key  (.. nul "merged:deg"))
 
 ;; Per-worker decoded value cache: {key -> {gen: N, value: table}}
 (local value-cache {})
@@ -151,9 +155,30 @@
         (ngx.log ngx.WARN "background refresh failed for key=" key ": " result)
         false))))
 
+;; Merged schema body cache — shared across workers.
+;; Avoids re-encoding the merged doc on every worker; one build per gen change.
+(fn get-merged []
+  (let [d (get-dict)
+        gen (d:get merged-gen-key)]
+    (when gen
+      {:body     (d:get merged-body-key)
+       :etag     (d:get merged-etag-key)
+       :gen      gen
+       :degraded (let [raw (d:get merged-deg-key)]
+                   (if raw (json.decode raw) []))})))
+
+(fn set-merged [gen body etag degraded]
+  (let [d (get-dict)]
+    (d:set merged-body-key body 0)
+    (d:set merged-etag-key etag 0)
+    (d:set merged-gen-key  gen  0)
+    (d:set merged-deg-key  (json.encode degraded) 0)))
+
 {:get cache-get
  :set cache-set
  :delete cache-delete
  :get-or-fetch get-or-fetch
  :force-refresh force-refresh
- :get-schema-gen get-schema-gen}
+ :get-schema-gen get-schema-gen
+ :get-merged get-merged
+ :set-merged set-merged}
