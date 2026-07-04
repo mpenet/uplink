@@ -1,4 +1,5 @@
 ;; Adaptive concurrency limiting — gradient algorithm.
+;; Based on Netflix's concurrency-limits library (https://github.com/Netflix/concurrency-limits).
 ;;
 ;; Tracks minimum observed RTT as a no-load baseline. When RTT rises above
 ;; baseline the limit decreases proportionally. When RTT is stable the limit
