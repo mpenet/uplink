@@ -167,12 +167,13 @@
        :degraded (let [raw (d:get merged-deg-key)]
                    (if raw (json.decode raw) []))})))
 
+;; gen written last — readers only observe the new gen once all fields are committed.
 (fn set-merged [gen body etag degraded]
   (let [d (get-dict)]
     (d:set merged-body-key body 0)
     (d:set merged-etag-key etag 0)
-    (d:set merged-gen-key  gen  0)
-    (d:set merged-deg-key  (json.encode degraded) 0)))
+    (d:set merged-deg-key  (json.encode degraded) 0)
+    (d:set merged-gen-key  gen  0)))
 
 {:get cache-get
  :set cache-set

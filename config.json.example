@@ -12,7 +12,7 @@
     {
       "name": "apisguru",
       "upstream": "https://api.apis.guru",
-      "schema_url": "https://api.apis.guru/v2/openapi.json",
+      "schema_url": "https://api.apis.guru/v2/openapi.yaml",
       "ttl": 300,
       "rules": {
         "methods": ["GET"]

@@ -23,26 +23,28 @@ Minimal `config.json`:
 {
   "services": [
     {
-      "name": "users",
-      "upstream": "http://users-svc:8080",
-      "schema_url": "http://users-svc:8080/openapi.json"
+      "name": "petstore",
+      "upstream": "https://petstore3.swagger.io",
+      "schema_url": "https://petstore3.swagger.io/api/v3/openapi.json",
+      "ttl": 300,
+      "rules": {
+        "methods": ["GET", "POST", "PUT", "DELETE"]
+      }
     },
     {
-      "name": "orders",
-      "upstream": "http://orders-svc:9090",
-      "schema_url": "http://orders-svc:9090/openapi.json",
-      "auth": {
-        "jwt": {
-          "jwks_url": "https://auth.example.com/.well-known/jwks.json",
-          "algorithms": ["RS256"]
-        }
+      "name": "apisguru",
+      "upstream": "https://api.apis.guru",
+      "schema_url": "https://api.apis.guru/v2/openapi.yaml",
+      "ttl": 300,
+      "rules": {
+        "methods": ["GET"]
       }
     }
   ]
 }
 ```
 
-`GET /users/v1/profile` → strips `/users` → proxied to `http://users-svc:8080/v1/profile`.  
+`GET /petstore/api/v3/pet/1` → strips `/petstore` → proxied to `https://petstore3.swagger.io/api/v3/pet/1`.  
 `GET /openapi.json` → merged schema for all services.
 
 See [`config.json.sample`](config.json.sample) for a full annotated example.
