@@ -2,41 +2,52 @@
 
 <br>
 
-OpenResty based API gateway that aggregates multiple upstream OpenAPI 3.x services under a single endpoint. Each service is exposed under a `/<name>` prefix; a merged `/openapi.json` covers all of them.
+OpenResty API gateway that aggregates multiple upstream OpenAPI 3.x services under a single endpoint. Each service is exposed under a `/<name>` prefix; a merged `/openapi.json` covers all of them.
 
-Proxying runs entirely through native nginx `proxy_pass` — keepalive pools, TLS, body streaming, and retries happen at C speed with no Lua on the hot path. Lua runs only in the access phase (JWT auth, rate limiting, adaptive concurrency, traceparent injection) and the log phase (metrics, OTel spans).
+Proxying runs through native nginx `proxy_pass` — keepalive pools, TLS, body streaming, and retries at C speed with no Lua on the hot path. Lua runs only in the access phase and log phase.
 
-**Features:** multi-upstream load balancing · per-service rate limiting · adaptive concurrency limiting · JWT authentication (HS*/RS*/ES*, JWKS) · W3C trace propagation · OpenTelemetry OTLP/HTTP · Prometheus metrics · JSON access log · server TLS/mTLS · WebSocket · CORS · header injection/stripping
-
-## How it works
-
-`config.json` describes your upstream services. At startup, Uplink generates nginx upstream and location blocks from it, then proxies requests under each service's `/<name>` prefix.
-
-- **Routing**: `GET /users/v1/profile` → strip `/users` → `GET /v1/profile` to the users upstream, over a keepalive pool
-- **Schema aggregation**: each service's OpenAPI schema is fetched, filtered by rules, component names are namespaced (`User` → `users__User`), and paths are prefixed before merging into `/openapi.json`
-- **Background refresh**: schemas are refreshed at 90% of their TTL; stale schemas are served on fetch failure
+**Proxy** — multi-upstream load balancing · keepalive pools · WebSocket · server TLS/mTLS · upstream mTLS  
+**Policy** — per-service JWT auth (HS*/RS*/ES*, JWKS) · rate limiting · adaptive concurrency limiting · CORS · header injection/stripping  
+**Observability** — Prometheus metrics · JSON access log · OpenTelemetry OTLP/HTTP · W3C trace propagation
 
 ## Quick start
-
-Pull the prebuilt image from the GitHub Container Registry:
 
 ```sh
 docker pull ghcr.io/mpenet/uplink:latest
 docker run -p 8080:8080 -v ./config.json:/uplink/config.json ghcr.io/mpenet/uplink:latest
 ```
 
-Or build from source:
+Minimal `config.json`:
 
-```sh
-docker build -t uplink .
-docker run -p 8080:8080 -v ./config.json:/uplink/config.json uplink
+```json
+{
+  "services": [
+    {
+      "name": "users",
+      "upstream": "http://users-svc:8080",
+      "schema_url": "http://users-svc:8080/openapi.json"
+    },
+    {
+      "name": "orders",
+      "upstream": "http://orders-svc:9090",
+      "schema_url": "http://orders-svc:9090/openapi.json",
+      "auth": {
+        "jwt": {
+          "jwks_url": "https://auth.example.com/.well-known/jwks.json",
+          "algorithms": ["RS256"]
+        }
+      }
+    }
+  ]
+}
 ```
 
-Copy [`config.json.sample`](config.json.sample) to `config.json`, point it at your upstreams, and you're done.
+`GET /users/v1/profile` → strips `/users` → proxied to `http://users-svc:8080/v1/profile`.  
+`GET /openapi.json` → merged schema for all services.
+
+See [`config.json.sample`](config.json.sample) for a full annotated example.
 
 ## Documentation
-
-See the **[documentation index](doc/index.md)** for all pages.
 
 | Page | Description |
 |------|-------------|
@@ -52,7 +63,6 @@ See the **[documentation index](doc/index.md)** for all pages.
 
 ## License
 
-Copyright © 2026 Max Penet 
+Copyright © 2026 Max Penet
 
 Distributed under the [Mozilla Public License 2.0](LICENSE)
-

@@ -1,14 +1,5 @@
 # How it works
 
-## Request lifecycle
-
-Each proxied request passes through four nginx phases:
-
-1. **Access phase (Lua)** — service matched by `/$name` prefix, prefix stripped, `traceparent` propagated or generated, rate limit checked (429 if exceeded), JWT validated (401 if invalid), adaptive concurrency checked (429 if exceeded), request headers injected/stripped
-2. **Proxy phase (nginx)** — `proxy_pass` to upstream over a keepalive pool; TLS, body streaming, and retries at C speed; no Lua on the hot path
-3. **Header filter phase (Lua)** — response headers injected/stripped
-4. **Log phase (Lua)** — request counted, latency recorded, adaptive concurrency limit updated, OTel span written (if enabled)
-
 ## Routing
 
 Incoming requests are matched by service name prefix. The prefix is stripped before forwarding:
