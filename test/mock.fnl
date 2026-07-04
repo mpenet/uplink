@@ -92,8 +92,6 @@
 
 (local cache-dict (make-shared-dict))
 (local metrics-dict (make-shared-dict))
-(local config-dict (make-shared-dict))
-(local circuit-dict (make-shared-dict))
 (local ratelimit-dict (make-shared-dict))
 (local otel-dict (make-shared-dict))
 
@@ -121,8 +119,6 @@
   {:INFO 6 :WARN 5 :ERR 3
    :shared {:uplink_cache cache-dict
             :uplink_metrics metrics-dict
-            :uplink_config config-dict
-            :uplink_circuit circuit-dict
             :uplink_ratelimit ratelimit-dict
             :uplink_otel otel-dict}
    :log (fn [& _] nil)
@@ -140,6 +136,7 @@
          :traceparent ""}
    :req (make-req)
    :header (make-resp-header-proxy)
+   :ctx {}
    :status 200
    :say (fn [_] nil)
    :print (fn [_] nil)
@@ -149,8 +146,8 @@
            (error (.. "ngx.exit:" code)))})
 
 (set _G._mock_dicts
-  {:cache cache-dict :metrics metrics-dict :config config-dict
-   :circuit circuit-dict :ratelimit ratelimit-dict :otel otel-dict})
+  {:cache cache-dict :metrics metrics-dict
+   :ratelimit ratelimit-dict :otel otel-dict})
 
 (fn reset-http []
   (set http-response {:status 200 :headers {"content-type" "application/json"} :body "{}"})
@@ -166,8 +163,6 @@
   (fn []
     (cache-dict:_reset)
     (metrics-dict:_reset)
-    (config-dict:_reset)
-    (circuit-dict:_reset)
     (ratelimit-dict:_reset)
     (otel-dict:_reset)
     (reset-http)
@@ -175,6 +170,7 @@
     (set _last_exit nil)
     (set _req_headers {"content-type" "application/json"})
     (set _resp_headers {})
+    (tset _G.ngx :ctx {})
     (tset _G.ngx :status 200)
     (tset _G.ngx :header (make-resp-header-proxy))
     (tset _G.ngx :var {:request_id "abcdef0123456789abcdef0123456789"

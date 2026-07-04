@@ -7,7 +7,7 @@
 ;;
 ;; nginx owns the actual upstream connection, keepalive pool, TLS,
 ;; body streaming, and retries. Lua only sets variables and enforces
-;; rate-limit / circuit-breaker policy.
+;; rate-limit / adaptive concurrency policy.
 ;;
 ;; Variables read from generated location blocks (set by nginx before access):
 ;;   $svc_name             — service name
@@ -18,7 +18,6 @@
 ;;   $traceparent    — W3C traceparent to forward upstream
 
 (local config-mod (require :config))
-(local circuit (require :circuit))
 (local ratelimit (require :ratelimit))
 (local adaptive (require :adaptive))
 (local metrics (require :metrics))
@@ -30,7 +29,7 @@
 
 (local services-by-name
   (let [by-name {}]
-    (each [_ svc (ipairs (config-mod.get).services)]
+    (each [_ svc (ipairs (. (config-mod.get) :services))]
       (tset by-name svc.name svc))
     by-name))
 
@@ -77,12 +76,6 @@
         (set ngx.status 429)
         (ngx.say "{\"error\":\"rate limit exceeded\"}")
         (ngx.exit 429)))
-    ;; Circuit breaker — 503 if open.
-    (when (not (circuit.allow? service))
-      (metrics.circuit-open svc-name)
-      (set ngx.status 503)
-      (ngx.say "{\"error\":\"service unavailable (circuit open)\"}")
-      (ngx.exit 503))
     ;; Request header manipulation — set/strip before forwarding upstream.
     (let [hdrs (and service.headers service.headers.request)]
       (when hdrs
@@ -97,9 +90,6 @@
 (fn on-response []
   (let [service (get-service ngx.var.svc_name)]
     (when service
-      (if (>= ngx.status 500)
-        (circuit.on-failure! service)
-        (circuit.on-success! service))
       ;; Response header manipulation — set/strip before returning to client.
       (let [hdrs (and service.headers service.headers.response)]
         (when hdrs

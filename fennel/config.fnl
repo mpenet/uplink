@@ -28,6 +28,10 @@
   (set _cfg (validate (load-file path)))
   _cfg)
 
+(fn store [cfg]
+  (set _cfg (validate cfg))
+  _cfg)
+
 (fn get [] _cfg)
 
-{:load load :get get}
+{:load load :store store :get get}

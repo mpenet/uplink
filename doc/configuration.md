@@ -28,7 +28,6 @@ All configuration changes take effect on restart. See [`config.json.sample`](../
 | `rules` | no | allow all | Route filter rules |
 | `tls` | no | — | Upstream mTLS client credentials |
 | `rate_limit` | no | — | Per-service rate limiting |
-| `circuit_breaker` | no | — | Per-service circuit breaker |
 | `nginx_directives` | no | — | Extra nginx directives injected into the location block |
 | `host_header` | no | first upstream host | Host header sent upstream |
 | `keepalive` | no | see below | Upstream keepalive pool settings |
@@ -173,18 +172,6 @@ Leaky bucket via `resty.limit.req`. Requests within `burst` are admitted immedia
 ```
 
 
-## Circuit breaker
-
-After `threshold` consecutive 5xx responses the circuit opens; requests get `503` for `open_ttl` seconds. After the TTL, one probe request is admitted — success closes the circuit (half-open state). A failed probe resets the TTL.
-
-```json
-"circuit_breaker": {
-  "threshold": 5,
-  "open_ttl": 30
-}
-```
-
-State is shared across all workers. 
 ## Keepalive pool
 
 ```json

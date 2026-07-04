@@ -4,10 +4,10 @@
 
 For each proxied request:
 
-1. **access phase (Lua)** — service matched by `/$name` prefix, prefix stripped, `traceparent` propagated or generated, rate limit checked (429 if exceeded), circuit breaker checked (503 if open), request headers injected/stripped
+1. **access phase (Lua)** — service matched by `/$name` prefix, prefix stripped, `traceparent` propagated or generated, rate limit checked (429 if exceeded), adaptive concurrency checked (429 if exceeded), request headers injected/stripped
 2. **proxy phase (nginx)** — `proxy_pass` to upstream over keepalive pool; TLS, body streaming, retries at C speed; no Lua on the hot path
-3. **header filter phase (Lua)** — circuit breaker state updated from response status, response headers injected/stripped
-4. **log phase (Lua)** — request counted, latency recorded, OTel span written (if enabled)
+3. **header filter phase (Lua)** — response headers injected/stripped
+4. **log phase (Lua)** — request counted, latency recorded, adaptive concurrency limit updated, OTel span written (if enabled)
 
 ## Routing
 
@@ -36,14 +36,6 @@ Each service's OpenAPI schema is fetched from `schema_url` (HTTP or HTTPS, JSON 
 ## Rate limiting
 
 Leaky bucket per service. When a request exceeds the configured rate, Uplink returns `429 {"error":"rate limit exceeded"}` immediately — the upstream is never contacted. Limit is enforced per worker process; effective cluster-wide limit in multi-replica deployments is `requests_per_second × replicas`.
-
-## Circuit breaker
-
-Three states per service, shared across all workers in a pod:
-
-- **CLOSED** — normal proxying. Failure counter increments on each 5xx response.
-- **OPEN** — triggered after `threshold` consecutive failures. All requests get `503 {"error":"service unavailable (circuit open)"}` for `open_ttl` seconds. The upstream is never contacted.
-- **HALF-OPEN** — after `open_ttl` expires, exactly one probe request is admitted (atomic shared dict lock). If it succeeds the circuit closes; if it fails the timer resets.
 
 ## Trace propagation
 

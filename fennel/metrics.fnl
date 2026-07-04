@@ -47,9 +47,6 @@
   (inc "proxy_errors_total"
        (.. "service=\"" service "\",code=\"" (tostring code) "\"")))
 
-(fn circuit-open [service]
-  (inc "circuit_open_total" (.. "service=\"" service "\"")))
-
 ;; ── Histogram ────────────────────────────────────────────────────────────────
 ;; Standard Prometheus latency buckets in seconds.
 
@@ -85,7 +82,6 @@
       "# TYPE schema_cache_result_total counter\n"
       "# TYPE proxy_requests_total counter\n"
       "# TYPE proxy_errors_total counter\n"
-      "# TYPE circuit_open_total counter\n"
       "# TYPE proxy_request_duration_seconds histogram\n"))
 
 (fn render []
@@ -103,6 +99,5 @@
  :cache-result cache-result
  :proxy-request proxy-request
  :proxy-error proxy-error
- :circuit-open circuit-open
  :observe-latency observe-latency
  :render render}

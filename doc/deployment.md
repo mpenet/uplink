@@ -247,10 +247,10 @@ cert-manager writes renewed certificates to the Secret and K8s updates the mount
 
 ### Horizontal scaling
 
-Uplink is stateless at the routing and proxying level and scales horizontally. Note that shared dict state — circuit breaker counters, rate limiter buckets, schema cache — is **per pod**. In a multi-replica deployment:
+Uplink is stateless at the routing and proxying level and scales horizontally. Note that shared dict state — rate limiter buckets, adaptive concurrency state, schema cache — is **per pod**. In a multi-replica deployment:
 
 - **Rate limits** are enforced per pod, not globally. A `requests_per_second: 100` limit with 3 replicas effectively allows ~300 rps cluster-wide.
-- **Circuit breakers** open independently per pod. A flapping upstream may trip the breaker on one pod while others continue proxying.
+- **Adaptive concurrency** state is per pod — each pod tracks its own inflight count and RTT baseline independently.
 - **Schema cache** is populated independently per pod on first request after startup.
 
 For global rate limiting, place a shared rate limiter (e.g. Redis + nginx-lua-resty-limit) in front of Uplink or at the Ingress layer.
@@ -261,9 +261,8 @@ For global rate limiting, place a shared rate limiter (e.g. Redis + nginx-lua-re
 |------|---------|-------|
 | `uplink_cache` | 10m | Schema JSON per service — increase for large or many schemas |
 | `uplink_metrics` | 2m | Prometheus counters and histogram buckets |
-| `uplink_config` | 1m | Active config + version counter |
-| `uplink_circuit` | 1m | Circuit breaker state per service |
 | `uplink_ratelimit` | 1m | Rate limiter state per service |
+| `uplink_adaptive` | 1m | Adaptive concurrency state per service |
 | `uplink_otel` | 2m | OTel span ring buffer (optional — see [observability](observability.md)) |
 
 Override by mounting a custom `nginx/nginx.conf`. See [`nginx/nginx.conf.sample`](../nginx/nginx.conf.sample) for a fully annotated starting point.
@@ -303,5 +302,3 @@ The `schema_url` for a service is wrong. Check the URL returns a valid OpenAPI 3
 **`/openapi.json` returns `500`**
 Check stderr (error log) for the underlying Lua error. Common causes: shared dict not defined in `nginx.conf`, missing required module, or a schema fetch error on all services simultaneously.
 
-**Circuit breaker stuck open**
-Restart the pod/container — circuit breaker state lives in `uplink_circuit` shared dict which is per-process. Alternatively, lower `open_ttl` in `config.json` and restart to let it recover faster.

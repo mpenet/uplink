@@ -39,8 +39,8 @@
       (let [cfg (or service.adaptive_concurrency {})
             name service.name
             lim (get-limit d name (or cfg.initial_limit 20))
-            (inf _) (d:incr (if-key name) 1 0)]
-        (if (> inf lim)
+            (n _) (d:incr (if-key name) 1 0)]
+        (if (> n lim)
           (do (d:incr (if-key name) -1 0) false)
           true)))))
 

@@ -10,7 +10,7 @@
     base))
 
 (fn load-service [svc]
-  (config.store-in-shared {:services [svc]}))
+  (config.store {:services [svc]}))
 
 (before_each
   (fn []
@@ -50,15 +50,6 @@
         (assert.is_truthy
           (_G.ngx.var.traceparent:match "^00%-aabbccddeeff00112233445566778899%-"))))
 
-    (it "exits 503 when circuit is open"
-      (fn []
-        (let [d _mock_dicts.circuit]
-          (d:set "cb:users:state" "open" 0)
-          (d:set "cb:users:opened" (- (os.time) 1) 0))
-        (let [(ok _) (pcall router.access)]
-          (assert.is_false ok)
-          (assert.equals 503 (get_last_exit)))))
-
     (it "exits 429 when rate limited"
       (fn []
         (set_rl_delay false)
@@ -75,27 +66,6 @@
         (let [(ok _) (pcall router.access)]
           (assert.is_false ok)
           (assert.equals 404 (get_last_exit)))))))
-
-(describe "router.on_response"
-  (fn []
-    (it "calls circuit on-failure for 5xx"
-      (fn []
-        (load-service (make-svc {:circuit_breaker {:threshold 1 :open_ttl 30}}))
-        (tset package.loaded :router nil)
-        (set router (require :router))
-        (tset _G.ngx :status 502)
-        (router.on_response)
-        (assert.equals "open"
-          (_mock_dicts.circuit:get "cb:users:state"))))
-
-    (it "calls circuit on-success for 2xx"
-      (fn []
-        (let [d _mock_dicts.circuit]
-          (d:set "cb:users:state" "open" 0)
-          (d:set "cb:users:fails" 5 0))
-        (tset _G.ngx :status 200)
-        (router.on_response)
-        (assert.is_nil (_mock_dicts.circuit:get "cb:users:state"))))))
 
 (describe "router.access header manipulation"
   (fn []

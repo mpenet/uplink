@@ -9,7 +9,6 @@
 | `proxy_requests_total` | `service` | Proxied requests |
 | `proxy_errors_total` | `service`, `code` | 5xx responses by status code |
 | `proxy_request_duration_seconds` | `service`, `le` | Upstream response time histogram |
-| `circuit_open_total` | `service` | Requests rejected due to open circuit |
 | `schema_fetch_total` | `service`, `status` | Schema fetches (`ok`, `error`, `background_ok`, `background_error`) |
 | `schema_cache_result_total` | `service`, `result` | Aggregation cache outcomes (`ok`, `error`) |
 

@@ -27,11 +27,6 @@
         "burst": 100
       },
 
-      "circuit_breaker": {
-        "threshold": 5,
-        "open_ttl": 30
-      },
-
       "headers": {
         "request": {
           "set":   {"X-Tenant": "acme", "X-Service-Version": "2"},
