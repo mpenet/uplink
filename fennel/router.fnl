@@ -18,6 +18,7 @@
 ;;   $traceparent    — W3C traceparent to forward upstream
 
 (local config-mod (require :config))
+(local auth (require :auth))
 (local ratelimit (require :ratelimit))
 (local adaptive (require :adaptive))
 (local metrics (require :metrics))
@@ -62,6 +63,9 @@
       (set ngx.var.upstream_path (if (= stripped "") "/" stripped)))
     ;; Traceparent: propagate existing trace or start new one.
     (set ngx.var.traceparent (make-traceparent (ngx.req.get_headers)))
+    ;; JWT auth — 401 if token missing or invalid.
+    (when service.auth
+      (auth.check service))
     ;; Adaptive concurrency — 429 if inflight exceeds dynamic limit.
     (when service.adaptive_concurrency
       (if (= false (adaptive.allow? service))

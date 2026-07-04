@@ -36,6 +36,7 @@ All configuration changes take effect on restart. See [`config.json.sample`](../
 | `cors` | no | — | CORS configuration |
 | `headers` | no | — | Request/response header injection and stripping |
 | `adaptive_concurrency` | no | — | Gradient-based adaptive concurrency limiting |
+| `auth` | no | — | Authentication — JWT validation |
 | `otel` | no | — | OpenTelemetry export config (see [Observability](observability.md)) |
 
 ## Rules
@@ -226,6 +227,77 @@ OPTIONS preflight is short-circuited with `204`.
 ```
 
 `request.*` runs in the access phase before forwarding. `response.*` runs in the header filter phase before returning to the client. 
+## Authentication
+
+JWT validation in the access phase via `service.auth.jwt`. Tokens must be presented as `Authorization: Bearer <token>`. Returns `401` on missing, malformed, or invalid tokens.
+
+### Key sources (mutually exclusive)
+
+**HMAC secret (HS256/HS384/HS512):**
+```json
+"auth": {
+  "jwt": {
+    "secret": "my-shared-secret",
+    "algorithms": ["HS256"]
+  }
+}
+```
+
+**Static PEM public key (RS256/RS384/RS512/ES256/ES384/ES512):**
+```json
+"auth": {
+  "jwt": {
+    "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
+    "algorithms": ["RS256"]
+  }
+}
+```
+
+**JWKS endpoint (RS256 — Auth0, Keycloak, Google, etc.):**
+```json
+"auth": {
+  "jwt": {
+    "jwks_url": "https://auth.example.com/.well-known/jwks.json",
+    "algorithms": ["RS256"],
+    "claims": {
+      "iss": "https://auth.example.com/",
+      "aud": "my-api"
+    }
+  }
+}
+```
+
+JWKS keys are fetched lazily on first request and cached per worker for 1 hour. On a cache miss for a `kid`, the JWKS is re-fetched once to handle key rotation.
+
+### Options
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `secret` | — | HMAC secret for HS* |
+| `public_key` | — | PEM public key string for RS*/ES* |
+| `jwks_url` | — | JWKS endpoint URL (RSA only) |
+| `algorithms` | `["RS256"]` | Allowed algorithm values. The token's `alg` header must match. Validated before signature to prevent algorithm confusion attacks |
+| `claims` | — | Required claim values. `aud` accepts string or array |
+| `header` | `"Authorization"` | Header to read the Bearer token from |
+| `strip` | `false` | Remove the auth header before forwarding upstream |
+| `forward` | — | Claim names to inject upstream as `X-JWT-<Name>` headers. Non-string values are JSON-encoded |
+
+### Example with claim forwarding
+
+```json
+"auth": {
+  "jwt": {
+    "jwks_url": "https://accounts.google.com/.well-known/openid-configuration",
+    "algorithms": ["RS256"],
+    "claims": {"iss": "https://accounts.google.com"},
+    "strip": true,
+    "forward": ["sub", "email"]
+  }
+}
+```
+
+Upstream receives `X-JWT-sub` and `X-JWT-email` headers; the original `Authorization` header is stripped.
+
 ## Adaptive concurrency
 
 Dynamically adjusts the in-flight request limit using a gradient algorithm. When upstream latency rises above the observed minimum, the limit shrinks; when latency is stable it probes upward. On upstream error it backs off by 10%. Requests that exceed the current limit get `429`.

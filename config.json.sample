@@ -74,6 +74,19 @@
         "cert": "/certs/orders-client.crt",
         "key": "/certs/orders-client.key",
         "verify": true
+      },
+
+      "auth": {
+        "jwt": {
+          "jwks_url": "https://auth.example.com/.well-known/jwks.json",
+          "algorithms": ["RS256"],
+          "claims": {
+            "iss": "https://auth.example.com/",
+            "aud": "orders-api"
+          },
+          "strip": true,
+          "forward": ["sub", "email"]
+        }
       }
     },
 

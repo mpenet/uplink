@@ -4,7 +4,7 @@
 
 For each proxied request:
 
-1. **access phase (Lua)** — service matched by `/$name` prefix, prefix stripped, `traceparent` propagated or generated, rate limit checked (429 if exceeded), adaptive concurrency checked (429 if exceeded), request headers injected/stripped
+1. **access phase (Lua)** — service matched by `/$name` prefix, prefix stripped, `traceparent` propagated or generated, JWT validated (401 if invalid), rate limit checked (429 if exceeded), adaptive concurrency checked (429 if exceeded), request headers injected/stripped
 2. **proxy phase (nginx)** — `proxy_pass` to upstream over keepalive pool; TLS, body streaming, retries at C speed; no Lua on the hot path
 3. **header filter phase (Lua)** — response headers injected/stripped
 4. **log phase (Lua)** — request counted, latency recorded, adaptive concurrency limit updated, OTel span written (if enabled)
@@ -32,6 +32,22 @@ Each service's OpenAPI schema is fetched from `schema_url` (HTTP or HTTPS, JSON 
 - **TTL priority** — `Cache-Control: s-maxage` > `Cache-Control: max-age` > `Expires` header > config `ttl`.
 - **Background refresh** — each service has a timer firing at 90% of its TTL. On failure the last good schema is served and a warning is logged.
 - **Degraded mode** — if a service has no usable schema (cold miss + fetch failure), it is excluded from the merged doc and listed in `X-Uplink-Degraded`.
+
+## Authentication
+
+Per-service JWT validation in the access phase. Tokens are read from `Authorization: Bearer <token>` (configurable). Invalid or missing tokens return `401` before the upstream is contacted.
+
+Three key sources are supported:
+
+- **HMAC secret** (`HS256`/`HS384`/`HS512`) — symmetric shared secret
+- **PEM public key** (`RS256`/`RS384`/`RS512`/`ES256`/`ES384`/`ES512`) — static key in config
+- **JWKS URL** (`RS256` and family) — keys fetched from an OIDC-compatible endpoint, cached per worker for 1 hour; cache is invalidated on unknown `kid` to handle key rotation
+
+The token's `alg` header is checked against a configured allowlist before the signature is verified, preventing algorithm confusion attacks. Standard claims (`exp`, `nbf`) are validated by the library. Additional claims (`iss`, `aud`, custom) can be required in config.
+
+Selected claims can be forwarded upstream as `X-JWT-<Name>` headers. The `Authorization` header can optionally be stripped before forwarding.
+
+Services with no `auth` field receive all requests without authentication.
 
 ## Rate limiting
 
