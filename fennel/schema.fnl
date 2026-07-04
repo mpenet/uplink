@@ -1,3 +1,21 @@
+;; Fetches and processes a single service's OpenAPI 3.x schema.
+;;
+;; process() is the main entry point:
+;;   1. Fetches schema_url via resty.http (JSON or YAML; YAML requires lyaml)
+;;   2. Filters paths by service rules (path/method/tag)
+;;   3. Rewrites all $refs in paths to use namespaced component names
+;;   4. Prefixes all component names with the service name (Foo → svc__Foo)
+;;   5. Returns {:openapi :info :paths :components :component-hashes :upstream-ttl}
+;;
+;; component-hashes carries pre-computed MD5s so aggregator.fnl can deduplicate
+;; across services without re-hashing on every merge.
+;;
+;; upstream-ttl is parsed from Cache-Control/Expires and overrides config ttl when
+;; present. nil means no TTL directive was found in the response headers.
+;;
+;; When service.tls.cert/key are set the schema fetch uses client TLS (mTLS),
+;; matching the credentials used for proxied upstream requests.
+
 (local http (require :resty.http))
 (local json (require :cjson))
 (local rules-mod (require :rules))
@@ -107,6 +125,8 @@
         (tset hashes section section-hashes)))
     {:components out :hashes hashes}))
 
+;; Non-method keys (parameters, summary, servers, …) are preserved on any
+;; path item that has at least one surviving method operation.
 (fn filter-paths [service paths]
   (let [filtered {}]
     (each [path path-item (pairs paths)]

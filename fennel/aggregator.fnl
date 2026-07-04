@@ -1,3 +1,17 @@
+;; Merges all service schemas into a single OpenAPI 3.0 document at /openapi.json.
+;;
+;; build() fetches each service's processed schema from the cache (triggering a
+;; network fetch on cold miss), prefixes paths (/svc/...) and component names
+;; (Foo → svc__Foo), deduplicates identical components across services, and
+;; rewrites $refs. Services whose schema is unavailable are excluded from the
+;; document and collected in the degraded list.
+;;
+;; handle() serves /openapi.json with ETag/304 support. After building, the
+;; encoded body is written to the shared dict keyed by schema generation counter.
+;; Subsequent workers that see the same gen reuse the shared dict body without
+;; rebuilding. Per-worker vars (agg-*) skip the shared dict read entirely when
+;; the gen has not changed since the last request on this worker.
+
 (local json (require :cjson))
 (local config-mod (require :config))
 (local schema-mod (require :schema))

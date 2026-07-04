@@ -1,3 +1,12 @@
+;; Configuration loader — reads config.json, validates it, and exposes a singleton.
+;;
+;; load() is called once in init_by_lua_block; all workers inherit the result
+;; via fork so get() is a pure table lookup on every subsequent call.
+;; store() bypasses the filesystem for tests.
+;;
+;; validate-service fills in defaults (ttl=300, rules={}) in place so all
+;; downstream callers can assume these fields are always present.
+
 (local json (require :cjson))
 
 (var _cfg nil)

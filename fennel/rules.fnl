@@ -1,3 +1,19 @@
+;; Path/method/tag filter predicates used when building the merged OpenAPI schema.
+;;
+;; Pattern syntax:
+;;   *        — matches any string
+;;   /v1/*    — prefix match (only trailing * is supported)
+;;   !pat     — negation: excluded strings always win over inclusions
+;;
+;; Semantics for a single filter list:
+;;   []           → allow all (not deny all)
+;;   ["GET"]      → allow only GET
+;;   ["!DELETE"]  → allow everything except DELETE
+;;   ["/v1/*", "!/v1/admin/*"] → /v1/* minus /v1/admin/*
+;;
+;; allow? ANDs all three filters: path ∩ method ∩ tag.
+;; Tag filter passes when any one of the operation's tags matches the tag pattern list.
+
 (fn wildcard-match? [pattern s]
   (if (= pattern "*")
     true
@@ -39,6 +55,8 @@
 (fn include-method? [rules method]
   (passes? (or rules.methods []) (method:upper)))
 
+;; Passes when any tag in op-tags matches the tag pattern list.
+;; Empty tag config → allow all (tag filter disabled).
 (fn include-tag? [rules op-tags]
   (let [tags (or rules.tags [])]
     (if (= (# tags) 0)
