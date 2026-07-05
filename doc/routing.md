@@ -10,72 +10,85 @@ Rules control which operations from a service's OpenAPI schema are included in t
 | `methods` | all | Method filter patterns |
 | `tags` | all | Tag filter patterns |
 
-Each field is an array of patterns. Empty or absent means **allow all**. Patterns support `*` as a trailing wildcard (`/v1/*`). Prefix a pattern with `!` to negate it.
+`rules` is an **array of rule objects**. An operation is included when it satisfies all filters within **any single rule** — rules are OR'd, filters within a rule are AND'd.
 
-### Evaluation rules
+```
+included = rule[0].paths ∩ rule[0].methods ∩ rule[0].tags
+         OR rule[1].paths ∩ rule[1].methods ∩ rule[1].tags
+         OR ...
+```
 
-- **Empty list** → allow all (not deny all)
-- **Inclusions only** → allow matching values, reject everything else
-- **Negations only** → allow everything except matching values
-- **Mixed** → allow values that match an inclusion AND do not match any negation
-- **Negations always win** — if a value matches both an inclusion and a negation, it is rejected
-- **Multiple negations are ORed** — a value is rejected if it matches any negation pattern
+Each rule field is optional. Absent or empty `rules` array → allow all.
+
+### Pattern syntax
+
+Each filter field is an array of patterns:
+
+- `*` — matches any string
+- `/v1/*` — prefix match (only trailing `*` is supported)
+- `!pat` — negation: if the value matches, the operation is excluded even if it also matches an inclusion pattern
+- Multiple negations are ORed — the value is excluded if it matches **any** negation
+
+Semantics for a single pattern list:
+
+| Patterns | Meaning |
+|----------|---------|
+| `[]` / absent | Allow all |
+| `["GET", "POST"]` | Allow only GET and POST |
+| `["!DELETE"]` | Allow everything except DELETE |
+| `["/v1/*", "!/v1/admin/*"]` | `/v1/*` minus `/v1/admin/*` |
+| `["!/internal/*", "!/admin/*"]` | Everything except `/internal/*` and `/admin/*` |
 
 ### Examples
 
-**Allow everything:**
+**Single rule — allow everything:**
 ```json
-"rules": {}
+"rules": []
 ```
 
-**Only GET and POST:**
+**Single rule — GET and POST, excluding internal paths:**
 ```json
-"rules": {
-  "methods": ["GET", "POST"]
-}
+"rules": [
+  {
+    "paths": ["!/internal/*", "!/debug/*"],
+    "methods": ["GET", "POST"]
+  }
+]
 ```
 
-**Everything except DELETE:**
+**Two rules — POST with tag `orders` OR any GET:**
 ```json
-"rules": {
-  "methods": ["!DELETE"]
-}
+"rules": [
+  {"methods": ["POST"], "tags": ["orders"]},
+  {"methods": ["GET"]}
+]
 ```
+A DELETE request matches neither rule and is excluded. A POST without the `orders` tag also matches neither.
 
-**Exclude multiple paths (both negations apply):**
+**Path-scoped rules — different method sets per version:**
 ```json
-"rules": {
-  "paths": ["!/internal/*", "!/admin/*"]
-}
+"rules": [
+  {"paths": ["/v1/*"], "methods": ["GET"]},
+  {"paths": ["/v2/*"], "methods": ["GET", "POST", "PUT", "DELETE"]}
+]
 ```
-Rejects `/internal/anything` and `/admin/anything`; all other paths pass.
-
-**Include range, exclude sub-path:**
-```json
-"rules": {
-  "paths": ["/v1/*", "!/v1/admin/*"]
-}
-```
-Only `/v1/*` paths, but not `/v1/admin/*`. `/v2/anything` is also rejected (no inclusion match).
-
-**Multiple exclusions within an included range:**
-```json
-"rules": {
-  "paths": ["/api/*", "!/api/internal/*", "!/api/debug/*"]
-}
-```
-Allows `/api/*` except `/api/internal/*` and `/api/debug/*`.
 
 **Full combination:**
 ```json
-"rules": {
-  "paths": ["/v1/*", "!/v1/admin/*"],
-  "methods": ["GET", "POST"],
-  "tags": ["public"]
-}
+"rules": [
+  {
+    "paths": ["/v1/*", "!/v1/admin/*"],
+    "methods": ["GET", "POST"],
+    "tags": ["public"]
+  },
+  {
+    "tags": ["internal"],
+    "methods": ["GET"]
+  }
+]
 ```
 
-Rules are AND'd across fields: a path must pass all three filters (path ∩ method ∩ tag) to be included. Filtering applies to the OpenAPI schema — it does not block proxied traffic, only controls which operations appear in `/openapi.json`.
+Filtering applies to the OpenAPI schema — it controls which operations appear in `/openapi.json`. It does not block proxied traffic.
 
 ## Multiple upstreams and load balancing
 

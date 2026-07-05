@@ -4,7 +4,7 @@
 ;; via fork so get() is a pure table lookup on every subsequent call.
 ;; store() bypasses the filesystem for tests.
 ;;
-;; validate-service fills in defaults (ttl=300, rules={}) in place so all
+;; validate-service fills in defaults (ttl=300, rules=[]) in place so all
 ;; downstream callers can assume these fields are always present.
 
 (local json (require :cjson))
@@ -24,7 +24,7 @@
   (when (not svc.ttl)
     (set svc.ttl 300))
   (when (not svc.rules)
-    (set svc.rules {}))
+    (set svc.rules []))
   svc)
 
 (fn validate [cfg]

@@ -33,64 +33,101 @@
       (fn []
         (assert.is_false (matches-any [] "/a"))))))
 
-(describe "allow?"
+(describe "allow? — single rule"
   (fn []
-    (local open {})
-
-    (it "allows everything with empty rules"
+    (it "allows everything with empty rules array"
       (fn []
-        (assert.is_true (allow open "/foo" "GET" []))
-        (assert.is_true (allow open "/bar" "POST" ["tag1"]))))
+        (assert.is_true (allow [] "/foo" "GET" []))
+        (assert.is_true (allow [] "/bar" "POST" ["tag1"]))))
+
+    (it "allows everything with nil rules"
+      (fn []
+        (assert.is_true (allow nil "/foo" "GET" []))))
 
     (it "paths whitelist"
       (fn []
-        (local r {:paths ["/v1/*"]})
+        (local r [{:paths ["/v1/*"]}])
         (assert.is_true (allow r "/v1/users" "GET" []))
         (assert.is_false (allow r "/v2/users" "GET" []))))
 
     (it "paths negation excludes matching paths"
       (fn []
-        (local r {:paths ["!/internal/*"]})
+        (local r [{:paths ["!/internal/*"]}])
         (assert.is_false (allow r "/internal/debug" "GET" []))
         (assert.is_true (allow r "/api/users" "GET" []))))
 
     (it "paths negation wins over positive match"
       (fn []
-        (local r {:paths ["*" "!/internal/*"]})
+        (local r [{:paths ["*" "!/internal/*"]}])
         (assert.is_false (allow r "/internal/debug" "GET" []))
         (assert.is_true (allow r "/api/users" "GET" []))))
 
     (it "methods whitelist"
       (fn []
-        (local r {:methods ["GET" "POST"]})
+        (local r [{:methods ["GET" "POST"]}])
         (assert.is_true (allow r "/foo" "GET" []))
         (assert.is_false (allow r "/foo" "DELETE" []))))
 
     (it "methods negation"
       (fn []
-        (local r {:methods ["!DELETE"]})
+        (local r [{:methods ["!DELETE"]}])
         (assert.is_true (allow r "/foo" "GET" []))
         (assert.is_false (allow r "/foo" "DELETE" []))))
 
     (it "method match is case-insensitive"
       (fn []
-        (local r {:methods ["GET"]})
+        (local r [{:methods ["GET"]}])
         (assert.is_true (allow r "/foo" "get" []))))
 
     (it "tags whitelist when non-empty"
       (fn []
-        (local r {:tags ["orders"]})
+        (local r [{:tags ["orders"]}])
         (assert.is_true (allow r "/foo" "GET" ["orders" "internal"]))
         (assert.is_false (allow r "/foo" "GET" ["users"]))
         (assert.is_false (allow r "/foo" "GET" []))))
 
     (it "tags negation"
       (fn []
-        (local r {:tags ["!internal"]})
+        (local r [{:tags ["!internal"]}])
         (assert.is_true (allow r "/foo" "GET" ["orders"]))
         (assert.is_false (allow r "/foo" "GET" ["internal"]))))
 
     (it "empty tags disables tag filter"
       (fn []
-        (assert.is_true (allow open "/foo" "GET" []))
-        (assert.is_true (allow open "/foo" "GET" ["anything"]))))))
+        (assert.is_true (allow [] "/foo" "GET" []))
+        (assert.is_true (allow [] "/foo" "GET" ["anything"]))))))
+
+(describe "allow? — multiple rules (OR semantics)"
+  (fn []
+    (it "passes when first rule matches"
+      (fn []
+        (local r [{:methods ["POST"] :tags ["orders"]}
+                  {:methods ["GET"]}])
+        (assert.is_true (allow r "/foo" "POST" ["orders"]))))
+
+    (it "passes when second rule matches"
+      (fn []
+        (local r [{:methods ["POST"] :tags ["orders"]}
+                  {:methods ["GET"]}])
+        (assert.is_true (allow r "/foo" "GET" []))))
+
+    (it "rejects when no rule matches"
+      (fn []
+        (local r [{:methods ["POST"] :tags ["orders"]}
+                  {:methods ["GET"]}])
+        (assert.is_false (allow r "/foo" "DELETE" []))))
+
+    (it "POST with wrong tag is rejected by first rule, no second rule match"
+      (fn []
+        (local r [{:methods ["POST"] :tags ["orders"]}
+                  {:methods ["GET"]}])
+        (assert.is_false (allow r "/foo" "POST" ["users"]))))
+
+    (it "path scoping per rule"
+      (fn []
+        (local r [{:paths ["/v1/*"] :methods ["GET" "POST"]}
+                  {:paths ["/v2/*"] :methods ["GET"]}])
+        (assert.is_true  (allow r "/v1/foo" "POST" []))
+        (assert.is_true  (allow r "/v2/foo" "GET"  []))
+        (assert.is_false (allow r "/v2/foo" "POST" []))
+        (assert.is_false (allow r "/v3/foo" "GET"  []))))))

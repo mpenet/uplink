@@ -24,6 +24,7 @@ streaming, and retries at **C speed** with no Lua on the hot path.
   - Adaptive concurrency limiting
   - CORS
   - Header injection/stripping
+  - Fine-grained route filtering (path, method, tag — with wildcard and negation patterns)
 - **Observability**
   - Prometheus metrics
   - JSON access log
@@ -49,20 +50,25 @@ Minimal `config.json`:
       "upstream": "https://petstore3.swagger.io",
       "schema_url": "https://petstore3.swagger.io/api/v3/openapi.json",
       "ttl": 300,
-      "rules": {
-        "paths": ["/api/v3/*", "!/api/v3/admin/*"],
-        "methods": ["GET", "POST", "PUT", "DELETE"]
-      }
+      "rules": [
+        {
+          "paths": ["/api/v3/*", "!/api/v3/admin/*"],
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "tags": ["pet", "store"]
+        }
+      ]
     },
     {
       "name": "apisguru",
       "upstream": "https://api.apis.guru",
       "schema_url": "https://api.apis.guru/v2/openapi.yaml",
       "ttl": 300,
-      "rules": {
-        "paths": ["!/v2/private/*"],
-        "methods": ["GET"]
-      }
+      "rules": [
+        {
+          "paths": ["!/v2/private/*"],
+          "methods": ["GET"]
+        }
+      ]
     }
   ]
 }
@@ -71,22 +77,25 @@ Minimal `config.json`:
 `GET /petstore/api/v3/pet/1` → strips `/petstore` → proxied to `https://petstore3.swagger.io/api/v3/pet/1`.  
 `GET /openapi.json` → merged schema for all services.
 
-Rule patterns support `*` as a trailing wildcard and `!` for negation:
+`rules` is an array — each element is a rule object whose fields are AND'd; rules are OR'd. Rule patterns support `*` as a trailing wildcard and `!` for negation:
 
 ```json
-"rules": { "paths": ["!/internal/*", "!/admin/*"] }
+"rules": [{"paths": ["!/internal/*", "!/admin/*"]}]
 ```
 Everything except `/internal/*` and `/admin/*` — multiple negations are ORed.
 
 ```json
-"rules": { "paths": ["/api/*", "!/api/internal/*", "!/api/debug/*"] }
+"rules": [{"paths": ["/api/*", "!/api/internal/*", "!/api/debug/*"]}]
 ```
 Only `/api/*`, but not `/api/internal/*` or `/api/debug/*`.
 
 ```json
-"rules": { "paths": ["/v1/*", "!/v1/admin/*"], "methods": ["GET", "POST"], "tags": ["public"] }
+"rules": [
+  {"paths": ["/v1/*", "!/v1/admin/*"], "methods": ["GET", "POST"], "tags": ["public"]},
+  {"methods": ["GET"], "tags": ["internal"]}
+]
 ```
-Filters are AND'd across fields: path ∩ method ∩ tag. See [Routing](doc/routing.md) for full semantics.
+POST on public `/v1/*` paths OR any GET tagged `internal`. Within each rule fields are AND'd; rules are OR'd. See [Routing](doc/routing.md) for full semantics.
 
 See [`config.json.sample`](config.json.sample) for a full annotated example.
 
