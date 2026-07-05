@@ -34,8 +34,6 @@ and idle memory sits in the low single-digit MB range.
   - OpenTelemetry OTLP/HTTP
   - W3C trace propagation
   
-... and more  
-
 ## Quick start
 
 ```sh
