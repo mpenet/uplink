@@ -12,6 +12,9 @@ prefix; a merged `/openapi.json` schema covers all of them.
 Proxying runs through **native nginx** `proxy_pass` — keepalive pools, TLS, body
 streaming, and retries at **C speed** with no Lua on the hot path.
 
+Built on [OpenResty](https://openresty.org) + Alpine: the Docker image is ~62 MB
+and idle memory sits in the low single-digit MB range.
+
 - **Proxy**
   - Multi-upstream load balancing
   - Keepalive pools
