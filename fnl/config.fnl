@@ -25,6 +25,9 @@
     (set svc.ttl 300))
   (when (not svc.rules)
     (set svc.rules []))
+  ;; nil → default to name; false → no prefix
+  (when (= svc.component_prefix nil)
+    (set svc.component_prefix svc.name))
   svc)
 
 (fn validate [cfg]

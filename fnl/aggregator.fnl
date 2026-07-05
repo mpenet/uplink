@@ -171,4 +171,8 @@
 {:build build
  :handle handle
  :get-service-schema get-service-schema
- :dedup-components dedup-components}
+ :dedup-components dedup-components
+ :merge-components merge-components
+ :apply-aliases! apply-aliases!
+ :prefix-paths prefix-paths
+ :deep-copy deep-copy}

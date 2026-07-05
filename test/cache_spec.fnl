@@ -71,6 +71,48 @@
         (cache.force-refresh "k2" 300 (fn [] {:value {:n 42} :ttl 300}))
         (assert.equals 42 (. (cache.get "k2") :n))))))
 
+(describe "get-merged / set-merged"
+  (fn []
+    (it "returns nil before any set"
+      (fn []
+        (assert.is_nil (cache.get-merged))))
+
+    (it "round-trips body, etag, gen, and degraded"
+      (fn []
+        (cache.set-merged 7 "{\"openapi\":\"3.0.0\"}" "abc123" ["svc-a"])
+        (let [m (cache.get-merged)]
+          (assert.equals 7 m.gen)
+          (assert.equals "{\"openapi\":\"3.0.0\"}" m.body)
+          (assert.equals "abc123" m.etag)
+          (assert.same ["svc-a"] m.degraded))))
+
+    (it "overwrites previous merged entry"
+      (fn []
+        (cache.set-merged 1 "old" "etag1" [])
+        (cache.set-merged 2 "new" "etag2" [])
+        (let [m (cache.get-merged)]
+          (assert.equals 2 m.gen)
+          (assert.equals "new" m.body))))
+
+    (it "returns empty degraded list when none set"
+      (fn []
+        (cache.set-merged 1 "body" "etag" [])
+        (assert.same [] (. (cache.get-merged) :degraded))))))
+
+(describe "stale fallback"
+  (fn []
+    (it "serves stale value when refresh fails"
+      (fn []
+        (let [json (require :cjson)
+              d _mock_dicts.cache
+              nul (string.char 0)]
+          ;; Plant a stale entry.
+          (d:set "svc" (json.encode {:ttl 10 :fetched_at (- (ngx.now) 999) :gen 1}) 0)
+          (d:set (.. "svc" nul "v") (json.encode {:msg "stale-value"}) 0)
+          (d:set (.. "svc" nul "g") 1 0))
+        (let [v (cache.get-or-fetch "svc" 300 (fn [] (error "upstream down")))]
+          (assert.equals "stale-value" v.msg))))))
+
 (describe "get-schema-gen"
   (fn []
     (it "starts at 0"

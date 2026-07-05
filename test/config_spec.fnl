@@ -36,6 +36,25 @@
         (let [cfg (config.store valid-cfg-no-defaults)]
           (assert.is_not_nil (. cfg.services 1 :rules)))))
 
+    (it "defaults component_prefix to service name"
+      (fn []
+        (let [cfg (config.store valid-cfg-no-defaults)]
+          (assert.equals "svc" (. cfg.services 1 :component_prefix)))))
+
+    (it "keeps explicit component_prefix string"
+      (fn []
+        (let [cfg (config.store {:services [{:name "svc" :upstream "http://x"
+                                             :schema_url "http://x"
+                                             :component_prefix "acme"}]})]
+          (assert.equals "acme" (. cfg.services 1 :component_prefix)))))
+
+    (it "keeps component_prefix false"
+      (fn []
+        (let [cfg (config.store {:services [{:name "svc" :upstream "http://x"
+                                             :schema_url "http://x"
+                                             :component_prefix false}]})]
+          (assert.is_false (. cfg.services 1 :component_prefix)))))
+
     (it "raises on missing name"
       (fn []
         (let [(ok err) (pcall config.store

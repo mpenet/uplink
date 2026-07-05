@@ -23,6 +23,7 @@ All configuration changes take effect on restart. See [`config.json.sample`](../
 | `name` | yes | — | Service identifier and route prefix. Only `[a-zA-Z0-9_-]` allowed |
 | `upstream` | yes | — | Upstream URL, array of URLs, or array of server objects. See [Routing](routing.md) |
 | `schema_url` | yes | — | URL of the service's OpenAPI 3.x JSON or YAML schema |
+| `component_prefix` | no | `name` | Prefix for namespacing OpenAPI component names in the merged schema (e.g. `acme_users` → `acme_users__User`). Defaults to `name`. Set to `false` to disable prefixing entirely |
 | `ttl` | no | `300` | Schema cache TTL in seconds. Upstream `Cache-Control`/`Expires` takes precedence |
 | `timeout` | no | `30000` | Connect/send/read timeout in milliseconds |
 | `rules` | no | allow all | Route filter rules. See [Routing](routing.md) |

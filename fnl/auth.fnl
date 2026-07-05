@@ -176,6 +176,7 @@
             token (and val (val:match "^[Bb]earer%s+(.+)$"))]
         (when (not token)
           (set ngx.status 401)
+          (tset ngx.header :www_authenticate "Bearer")
           (ngx.say "{\"error\":\"missing or invalid Authorization header\"}")
           (ngx.exit 401))
         (let [(ok payload) (pcall verify token cfg)]
@@ -183,6 +184,7 @@
             (do
               (ngx.log ngx.WARN "auth: JWT rejected: " payload)
               (set ngx.status 401)
+              (tset ngx.header :www_authenticate "Bearer error=\"invalid_token\"")
               (ngx.say "{\"error\":\"unauthorized\"}")
               (ngx.exit 401))
             (do
@@ -196,4 +198,7 @@
                         (.. "X-JWT-" claim)
                         (if (= (type v) "string") v (json.encode v))))))))))))))
 
-{:check check}
+{:check check
+ :get-jwks-pems get-jwks-pems
+ :resolve-jwks-key resolve-jwks-key
+ :parse-jwks parse-jwks}

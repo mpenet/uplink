@@ -44,7 +44,7 @@
           (tonumber smaxage)
           (if maxage
             (tonumber maxage)
-            (when (or (cc:find "no%-cache" 1 true) (cc:find "no%-store" 1 true))
+            (when (or (cc:find "no-cache" 1 true) (cc:find "no-store" 1 true))
               0))))
       (let [expires (or (. headers :expires) (. headers "Expires"))]
         (when expires
@@ -88,7 +88,12 @@
           (client:set_keepalive keepalive-timeout-ms keepalive-pool-size)
           {:body body :upstream-ttl upstream-ttl})))))
 
-(fn rewrite-ref-str [service-name ref]
+(fn apply-prefix [component-prefix name]
+  (if component-prefix
+    (.. component-prefix "__" name)
+    name))
+
+(fn rewrite-ref-str [component-prefix ref]
   (let [prefix "#/components/"]
     (if (= (ref:sub 1 (# prefix)) prefix)
       (let [rest (ref:sub (+ (# prefix) 1))
@@ -96,29 +101,29 @@
         (if slash
           (let [section (rest:sub 1 (- slash 1))
                 name (rest:sub (+ slash 1))]
-            (.. prefix section "/" service-name "__" name))
+            (.. prefix section "/" (apply-prefix component-prefix name)))
           ref))
       ref)))
 
-(fn rewrite-refs! [service-name obj]
+(fn rewrite-refs! [component-prefix obj]
   (when (= (type obj) :table)
     (each [k v (pairs obj)]
       (if (and (= k "$ref") (= (type v) :string))
-        (tset obj k (rewrite-ref-str service-name v))
-        (rewrite-refs! service-name v))))
+        (tset obj k (rewrite-ref-str component-prefix v))
+        (rewrite-refs! component-prefix v))))
   obj)
 
-;; Prefix all component names with service name and compute content hashes.
+;; Prefix all component names and compute content hashes.
 ;; Returns {:components {section {name schema}} :hashes {section {name md5}}}.
-(fn prefix-components [service-name components]
+(fn prefix-components [component-prefix components]
   (let [out {}
         hashes {}]
     (each [section items (pairs components)]
       (let [new-section {}
             section-hashes {}]
         (each [name schema (pairs items)]
-          (rewrite-refs! service-name schema)
-          (let [new-name (.. service-name "__" name)]
+          (rewrite-refs! component-prefix schema)
+          (let [new-name (apply-prefix component-prefix name)]
             (tset new-section new-name schema)
             (tset section-hashes new-name (ngx.md5 (json.encode schema)))))
         (tset out section new-section)
@@ -150,10 +155,11 @@
         (metrics.schema-fetch service.name :error)
         (error result))
       (let [{:body raw :upstream-ttl upstream-ttl} result
+            cp service.component_prefix
             paths (filter-paths service (or raw.paths {}))
-            _ (rewrite-refs! service.name paths)
+            _ (rewrite-refs! cp paths)
             {:components components :hashes hashes}
-            (prefix-components service.name (or raw.components {}))]
+            (prefix-components cp (or raw.components {}))]
         (metrics.schema-fetch service.name :ok)
         {:openapi raw.openapi
          :info raw.info
@@ -166,4 +172,6 @@
  :process process
  :parse-cache-ttl parse-cache-ttl
  :rewrite-ref-str rewrite-ref-str
- :rewrite-refs! rewrite-refs!}
+ :rewrite-refs! rewrite-refs!
+ :prefix-components prefix-components
+ :filter-paths filter-paths}

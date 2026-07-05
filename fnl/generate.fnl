@@ -148,6 +148,7 @@
         timeout-s (math.max 1 (math.ceil (/ (or svc.timeout 30000) 1000)))
         host-hdr (service-host-hdr svc)]
     (table.insert buf (.. "location ~ ^/" svc.name "(/|$) {\n"))
+    (table.insert buf     "    default_type               application/json;\n")
     (table.insert buf (.. "    set $svc_name             \"" svc.name "\";\n"))
     (table.insert buf (.. "    set $upstream_host_header \"" host-hdr "\";\n"))
     (when https

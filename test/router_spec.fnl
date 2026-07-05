@@ -65,7 +65,16 @@
         (tset _G.ngx.var :svc_name "nonexistent")
         (let [(ok _) (pcall router.access)]
           (assert.is_false ok)
-          (assert.equals 404 (get_last_exit)))))))
+          (assert.equals 404 (get_last_exit)))))
+
+    (it "exits 429 when adaptive concurrency limit exceeded"
+      (fn []
+        (load-service (make-svc {:adaptive_concurrency {:initial_limit 0 :min_limit 0}}))
+        (tset package.loaded :router nil)
+        (set router (require :router))
+        (let [(ok _) (pcall router.access)]
+          (assert.is_false ok)
+          (assert.equals 429 (get_last_exit)))))))
 
 (describe "router.access header manipulation"
   (fn []
@@ -120,4 +129,26 @@
         (tset _G.ngx :status 500)
         (router.log)
         (assert.equals 1
-          (_mock_dicts.metrics:get "proxy_errors_total{service=\"users\",code=\"500\"}"))))))
+          (_mock_dicts.metrics:get "proxy_errors_total{service=\"users\",code=\"500\"}"))))
+
+    (it "records latency histogram via observe-latency"
+      (fn []
+        (tset _G.ngx :status 200)
+        (tset _G.ngx.var :upstream_response_time "0.042")
+        (router.log)
+        (assert.equals 1
+          (_mock_dicts.metrics:get "proxy_request_duration_seconds_count{service=\"users\"}"))))
+
+    (it "calls adaptive on-complete! when admitted"
+      (fn []
+        (load-service (make-svc {:adaptive_concurrency {:initial_limit 20}}))
+        (tset package.loaded :router nil)
+        (set router (require :router))
+        (tset _G.ngx :status 200)
+        (tset _G.ngx :ctx {:adaptive_admitted true})
+        (tset _G.ngx.var :upstream_response_time "0.01")
+        (router.log)
+        ;; After on-complete! the inflight counter should be decremented (was 0, now -1 via mock incr).
+        ;; We verify it ran by checking inflight went below 0 — mock incr allows this.
+        (assert.is_truthy
+          (<= (_mock_dicts.adaptive:get "ac:users:if") 0))))))

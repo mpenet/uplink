@@ -94,6 +94,7 @@
 (local metrics-dict (make-shared-dict))
 (local ratelimit-dict (make-shared-dict))
 (local otel-dict (make-shared-dict))
+(local adaptive-dict (make-shared-dict))
 
 ;; ── Global ngx mock ───────────────────────────────────────────────────────────
 
@@ -120,12 +121,14 @@
    :shared {:uplink_cache cache-dict
             :uplink_metrics metrics-dict
             :uplink_ratelimit ratelimit-dict
-            :uplink_otel otel-dict}
+            :uplink_otel otel-dict
+            :uplink_adaptive adaptive-dict}
    :log (fn [& _] nil)
    :now (fn [] (os.time))
    :md5 (fn [s] (string.format "%d:%s:%s" (# s) (s:sub 1 1) (s:sub -1)))
    ;; Encode bytes as lowercase hex — not real base64 but deterministic for tests.
    :encode_base64 (fn [s] (s:gsub "." (fn [c] (string.format "%02x" (string.byte c)))))
+   :decode_base64 (fn [s] s)
    :var {:request_id "abcdef0123456789abcdef0123456789"
          :uri "/users/v1/profile"
          :request_uri "/users/v1/profile"
@@ -147,7 +150,8 @@
 
 (set _G._mock_dicts
   {:cache cache-dict :metrics metrics-dict
-   :ratelimit ratelimit-dict :otel otel-dict})
+   :ratelimit ratelimit-dict :otel otel-dict
+   :adaptive adaptive-dict})
 
 (fn reset-http []
   (set http-response {:status 200 :headers {"content-type" "application/json"} :body "{}"})
@@ -165,6 +169,7 @@
     (metrics-dict:_reset)
     (ratelimit-dict:_reset)
     (otel-dict:_reset)
+    (adaptive-dict:_reset)
     (reset-http)
     (set rl-delay 0)
     (set _last_exit nil)
@@ -183,4 +188,5 @@
                        :traceparent ""})
     (tset _G.ngx :req (make-req))
     (tset _G.ngx :encode_base64
-      (fn [s] (s:gsub "." (fn [c] (string.format "%02x" (string.byte c))))))))
+      (fn [s] (s:gsub "." (fn [c] (string.format "%02x" (string.byte c))))))
+    (tset _G.ngx :decode_base64 (fn [s] s))))
