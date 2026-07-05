@@ -1,5 +1,9 @@
 <img width="200" height="200" src="https://github.com/user-attachments/assets/b9419850-2195-4138-9938-ba2347daece3" />
 
+[![CI](https://github.com/mpenet/uplink/actions/workflows/test.yml/badge.svg)](https://github.com/mpenet/uplink/actions/workflows/test.yml)
+[![GitHub release](https://img.shields.io/github/v/release/mpenet/uplink)](https://github.com/mpenet/uplink/releases/latest)
+[![ghcr.io](https://img.shields.io/badge/ghcr.io-mpenet%2Fuplink-blue)](https://github.com/mpenet/uplink/pkgs/container/uplink)
+
 <br>
 
 OpenResty based API gateway that aggregates multiple upstream OpenAPI 3.x
