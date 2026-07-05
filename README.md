@@ -31,6 +31,7 @@ Minimal `config.json`:
       "schema_url": "https://petstore3.swagger.io/api/v3/openapi.json",
       "ttl": 300,
       "rules": {
+        "paths": ["/api/v3/*", "!/api/v3/admin/*"],
         "methods": ["GET", "POST", "PUT", "DELETE"]
       }
     },
@@ -40,6 +41,7 @@ Minimal `config.json`:
       "schema_url": "https://api.apis.guru/v2/openapi.yaml",
       "ttl": 300,
       "rules": {
+        "paths": ["!/v2/private/*"],
         "methods": ["GET"]
       }
     }
@@ -49,6 +51,23 @@ Minimal `config.json`:
 
 `GET /petstore/api/v3/pet/1` → strips `/petstore` → proxied to `https://petstore3.swagger.io/api/v3/pet/1`.  
 `GET /openapi.json` → merged schema for all services.
+
+Rule patterns support `*` as a trailing wildcard and `!` for negation:
+
+```json
+"rules": { "paths": ["!/internal/*", "!/admin/*"] }
+```
+Everything except `/internal/*` and `/admin/*` — multiple negations are ORed.
+
+```json
+"rules": { "paths": ["/api/*", "!/api/internal/*", "!/api/debug/*"] }
+```
+Only `/api/*`, but not `/api/internal/*` or `/api/debug/*`.
+
+```json
+"rules": { "paths": ["/v1/*", "!/v1/admin/*"], "methods": ["GET", "POST"], "tags": ["public"] }
+```
+Filters are AND'd across fields: path ∩ method ∩ tag. See [Routing](doc/routing.md) for full semantics.
 
 See [`config.json.sample`](config.json.sample) for a full annotated example.
 

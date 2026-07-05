@@ -10,7 +10,18 @@ Rules control which operations from a service's OpenAPI schema are included in t
 | `methods` | all | Method filter patterns |
 | `tags` | all | Tag filter patterns |
 
-Each field is an array of patterns. Empty or absent means **allow all**. Patterns support `*` as a suffix wildcard (`/v1/*`). Prefix a pattern with `!` to exclude — exclusions always win over inclusions.
+Each field is an array of patterns. Empty or absent means **allow all**. Patterns support `*` as a trailing wildcard (`/v1/*`). Prefix a pattern with `!` to negate it.
+
+### Evaluation rules
+
+- **Empty list** → allow all (not deny all)
+- **Inclusions only** → allow matching values, reject everything else
+- **Negations only** → allow everything except matching values
+- **Mixed** → allow values that match an inclusion AND do not match any negation
+- **Negations always win** — if a value matches both an inclusion and a negation, it is rejected
+- **Multiple negations are ORed** — a value is rejected if it matches any negation pattern
+
+### Examples
 
 **Allow everything:**
 ```json
@@ -24,23 +35,47 @@ Each field is an array of patterns. Empty or absent means **allow all**. Pattern
 }
 ```
 
-**All paths except `/internal/*`, all methods except DELETE:**
+**Everything except DELETE:**
 ```json
 "rules": {
-  "paths": ["!/internal/*"],
   "methods": ["!DELETE"]
 }
 ```
 
-**Only `/v1/*` paths (excluding `/v1/admin/*`) with the `public` tag:**
+**Exclude multiple paths (both negations apply):**
+```json
+"rules": {
+  "paths": ["!/internal/*", "!/admin/*"]
+}
+```
+Rejects `/internal/anything` and `/admin/anything`; all other paths pass.
+
+**Include range, exclude sub-path:**
+```json
+"rules": {
+  "paths": ["/v1/*", "!/v1/admin/*"]
+}
+```
+Only `/v1/*` paths, but not `/v1/admin/*`. `/v2/anything` is also rejected (no inclusion match).
+
+**Multiple exclusions within an included range:**
+```json
+"rules": {
+  "paths": ["/api/*", "!/api/internal/*", "!/api/debug/*"]
+}
+```
+Allows `/api/*` except `/api/internal/*` and `/api/debug/*`.
+
+**Full combination:**
 ```json
 "rules": {
   "paths": ["/v1/*", "!/v1/admin/*"],
+  "methods": ["GET", "POST"],
   "tags": ["public"]
 }
 ```
 
-Rules are AND'd: a path must pass all three filters (path ∩ method ∩ tag) to be included.
+Rules are AND'd across fields: a path must pass all three filters (path ∩ method ∩ tag) to be included. Filtering applies to the OpenAPI schema — it does not block proxied traffic, only controls which operations appear in `/openapi.json`.
 
 ## Multiple upstreams and load balancing
 
