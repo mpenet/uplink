@@ -83,10 +83,12 @@
         (do (client:close)
             (error (.. "schema fetch returned HTTP " res.status " for " url)))
         (let [ct (or (. res.headers :content-type) "")
-              body (parse-body url ct res.body)
-              upstream-ttl (parse-cache-ttl res.headers)]
-          (client:set_keepalive keepalive-timeout-ms keepalive-pool-size)
-          {:body body :upstream-ttl upstream-ttl})))))
+              (parse-ok body) (pcall parse-body url ct res.body)]
+          (if (not parse-ok)
+            (do (client:close) (error body))
+            (let [upstream-ttl (parse-cache-ttl res.headers)]
+              (client:set_keepalive keepalive-timeout-ms keepalive-pool-size)
+              {:body body :upstream-ttl upstream-ttl})))))))
 
 (fn apply-prefix [component-prefix name]
   (if component-prefix

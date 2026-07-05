@@ -157,10 +157,10 @@
             (set agg-degraded degraded)
             (set agg-gen      gen)
             (cache.set-merged gen body etag degraded)))))
-    (tset ngx.header :etag (.. "\"" agg-etag "\""))
-    (tset ngx.header :cache_control "no-cache")
+    (tset ngx.header "ETag" (.. "\"" agg-etag "\""))
+    (tset ngx.header "Cache-Control" "no-cache")
     (when (> (# agg-degraded) 0)
-      (tset ngx.header :x_uplink_degraded (table.concat agg-degraded ",")))
+      (tset ngx.header "X-Uplink-Degraded" (table.concat agg-degraded ",")))
     (let [inm (. (ngx.req.get_headers) :if_none_match)]
       (if (and inm (= inm (.. "\"" agg-etag "\"")))
         (ngx.exit 304)

@@ -66,10 +66,12 @@
             (let [now (ngx.now)
                   age (or (d:get (ma-key name)) 0)
                   cur-min (d:get (mr-key name))
-                  min-rtt (math.min (or cur-min rtt-us) rtt-us)]
-              (when (or (not cur-min) (> (- now age) reset-sec))
-                (d:set (mr-key name) rtt-us 0)
+                  reset? (or (not cur-min) (> (- now age) reset-sec))
+                  min-rtt (if reset? rtt-us (math.min cur-min rtt-us))]
+              (when reset?
                 (d:set (ma-key name) now 0))
+              ;; Always persist min-rtt so all workers share the same baseline.
+              (d:set (mr-key name) min-rtt 0)
               (let [cur-lim (get-limit d name init)
                     new-lim (if success
                               (let [gradient (/ min-rtt (math.max new-ema 1))

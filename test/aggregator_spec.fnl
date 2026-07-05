@@ -365,8 +365,8 @@
         (local {:handle handle} (require :aggregator))
         (seed-merged "{\"openapi\":\"3.0.0\"}" "abc123" [])
         (handle)
-        (assert.equals "\"abc123\"" (. _G.ngx.header :etag))
-        (assert.equals "no-cache"  (. _G.ngx.header :cache_control))))
+        (assert.equals "\"abc123\"" (. _G.ngx.header "ETag"))
+        (assert.equals "no-cache"  (. _G.ngx.header "Cache-Control"))))
 
     (it "returns 304 when If-None-Match matches ETag"
       (fn []
@@ -404,11 +404,11 @@
         (local {:handle handle} (require :aggregator))
         (seed-merged "{}" "etag1" ["svc-a" "svc-b"])
         (handle)
-        (assert.equals "svc-a,svc-b" (. _G.ngx.header :x_uplink_degraded))))
+        (assert.equals "svc-a,svc-b" (. _G.ngx.header "X-Uplink-Degraded"))))
 
     (it "does not set X-Uplink-Degraded when no degraded services"
       (fn []
         (local {:handle handle} (require :aggregator))
         (seed-merged "{}" "etag1" [])
         (handle)
-        (assert.is_nil (. _G.ngx.header :x_uplink_degraded))))))
+        (assert.is_nil (. _G.ngx.header "X-Uplink-Degraded"))))))

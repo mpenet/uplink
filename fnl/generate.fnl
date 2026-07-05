@@ -38,6 +38,22 @@
   (assert (name:match "^[a-zA-Z0-9_-]+$")
           (.. "invalid service name: '" name "' — only [a-zA-Z0-9_-] allowed")))
 
+(fn validate-nginx-directive [directive svc-name]
+  (assert (= (type directive) "string")
+          (.. "service '" svc-name "': nginx_directives entries must be strings"))
+  (each [_ ch (ipairs ["{" "}" "\n" "#"])]
+    (assert (not (directive:find ch 1 true))
+            (.. "service '" svc-name "': nginx_directive contains forbidden character '" ch "': " directive)))
+  ;; Reject multiple semicolons — the trailing one is added by emit-location;
+  ;; a semicolon inside the value would close the directive early.
+  (assert (not (directive:find ";" 1 true))
+          (.. "service '" svc-name "': nginx_directive must not contain ';': " directive)))
+
+(fn validate-cors-origin [origin svc-name]
+  (each [_ ch (ipairs ["\"" "\n" "\r" " " "\t"])]
+    (assert (not (origin:find ch 1 true))
+            (.. "service '" svc-name "': CORS origin contains forbidden character: " origin))))
+
 ;; Normalise upstream field to array of entry objects {url, ?weight, ...}.
 (fn upstream-entries [svc]
   (let [raw (if (= (type svc.upstream) :string) [svc.upstream] svc.upstream)]
@@ -101,6 +117,8 @@
     (when cors
       (let [origins (or cors.origins [])]
         (when (and (> (# origins) 1) (not= (. origins 1) "*"))
+          (each [_ o (ipairs origins)]
+            (validate-cors-origin o svc.name))
           (table.insert buf (.. "map $http_origin " (cors-var svc.name) " {\n"))
           (table.insert buf     "    default \"\";\n")
           (each [_ o (ipairs origins)]
@@ -176,6 +194,7 @@
       (emit-cors-directives svc buf))
     (when svc.nginx_directives
       (each [_ directive (ipairs svc.nginx_directives)]
+        (validate-nginx-directive directive svc.name)
         (table.insert buf (.. "    " directive ";\n"))))
     (table.insert buf     "    access_by_lua_block        { require(\"router\").access() }\n")
     (table.insert buf     "    header_filter_by_lua_block { require(\"router\").on_response() }\n")
