@@ -1,6 +1,6 @@
 [![CI](https://github.com/mpenet/uplink/actions/workflows/test.yml/badge.svg)](https://github.com/mpenet/uplink/actions/workflows/test.yml)
 [![ghcr.io](https://img.shields.io/badge/ghcr.io-mpenet%2Fuplink-blue)](https://github.com/mpenet/uplink/pkgs/container/uplink)
-<br>
+<br><br>
 <img width="200" height="200" src="https://github.com/user-attachments/assets/b9419850-2195-4138-9938-ba2347daece3" />
 <br>
 
