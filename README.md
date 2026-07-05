@@ -2,13 +2,16 @@
 
 <br>
 
-OpenResty API gateway that aggregates multiple upstream OpenAPI 3.x services under a single endpoint. Each service is exposed under a `/<name>` prefix; a merged `/openapi.json` covers all of them.
+OpenResty based API gateway that aggregates multiple upstream OpenAPI 3.x
+services under a single endpoint. Each service is exposed under a `/<name>`
+prefix; a merged `/openapi.json` schema covers all of them.
 
-Proxying runs through native nginx `proxy_pass` — keepalive pools, TLS, body streaming, and retries at C speed with no Lua on the hot path. Lua runs only in the access phase and log phase.
+Proxying runs through native nginx `proxy_pass` — keepalive pools, TLS, body
+streaming, and retries at C speed with no Lua on the hot path.
 
-**Proxy** — multi-upstream load balancing · keepalive pools · WebSocket · server TLS/mTLS · upstream mTLS  
-**Policy** — per-service JWT auth (HS*/RS*/ES*, JWKS) · rate limiting · adaptive concurrency limiting · CORS · header injection/stripping  
-**Observability** — Prometheus metrics · JSON access log · OpenTelemetry OTLP/HTTP · W3C trace propagation
+**Proxy** — multi-upstream load balancing · keepalive pools · WebSocket · server TLS/mTLS · upstream mTLS
+**Policy** — per-service JWT auth (HS*/RS*/ES*, JWKS) · rate limiting · adaptive concurrency limiting · CORS · header injection/stripping
+**Observability** — Prometheus metrics · JSON access log · OpenTelemetry · W3C trace propagation
 
 ## Quick start
 
